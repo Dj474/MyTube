@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 public class Profile {
 
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
     private Long id;
 

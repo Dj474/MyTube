@@ -41,6 +41,7 @@ public class JwtTokenFilter extends OncePerRequestFilter {
                 SecurityContextHolder.clearContext();
             }
         }
+        filterChain.doFilter(request, response);
     }
 
     private String getTokenFromRequest(HttpServletRequest request) {

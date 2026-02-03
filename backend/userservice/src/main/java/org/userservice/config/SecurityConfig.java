@@ -27,6 +27,7 @@ public class SecurityConfig {
         this.jwtTokenProvider = jwtTokenProvider;
     }
 
+    @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
             .cors(cors ->{})
