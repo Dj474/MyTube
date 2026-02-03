@@ -12,9 +12,13 @@ import org.userservice.dto.security.JwtDtoOut;
 import org.userservice.dto.security.JwtRefreshDtoIn;
 import org.userservice.dto.security.JwtRefreshDtoOut;
 import org.userservice.entity.user.User;
+import org.userservice.entity.userProfile.UserProfile;
+import org.userservice.exception.BadRequestException;
 import org.userservice.exception.ForbiddenException;
 import org.userservice.exception.NotFoundException;
+import org.userservice.exception.UnauthorizedException;
 import org.userservice.repository.user.UserRepository;
+import org.userservice.repository.userProfile.UserProfileRepository;
 import org.userservice.security.jwt.JwtTokenProvider;
 import org.userservice.security.service.AuthService;
 
@@ -27,6 +31,7 @@ public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final UserProfileRepository userProfileRepository;
 
     private JwtDtoOut getJwtForUser(User user) {
         JwtDtoOut jwtDtoOut = new JwtDtoOut();
@@ -40,13 +45,19 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public JwtDtoOut register(AuthenticationDtoIn userDtoIn) {
         if (userRepository.existsByEmail(userDtoIn.getEmail())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Login exists");
+            throw new BadRequestException("Login exists");
         }
 
         User user = new User();
         user.setEmail(userDtoIn.getEmail());
         user.setPassword(passwordEncoder.encode(userDtoIn.getPassword()));
+
+        UserProfile userProfile = new UserProfile();
+        user.setProfile(userProfile);
+        userProfile.setUser(user);
+
         userRepository.save(user);
+        userProfileRepository.save(userProfile);
 
         return getJwtForUser(user);
     }
@@ -57,11 +68,11 @@ public class AuthServiceImpl implements AuthService {
 
         User user = userRepository.findByEmail(userDtoIn.getEmail()).orElse(null);
         if (Objects.isNull(user)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Login not exists");
+            throw new NotFoundException("Login not exists");
         }
 
         if (!passwordEncoder.matches(userDtoIn.getPassword(), user.getPassword())) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Wrong password");
+            throw new UnauthorizedException("Wrong password");
         }
 
         return getJwtForUser(user);
