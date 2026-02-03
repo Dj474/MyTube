@@ -12,6 +12,8 @@ import org.userservice.dto.security.JwtDtoOut;
 import org.userservice.dto.security.JwtRefreshDtoIn;
 import org.userservice.dto.security.JwtRefreshDtoOut;
 import org.userservice.entity.user.User;
+import org.userservice.exception.ForbiddenException;
+import org.userservice.exception.NotFoundException;
 import org.userservice.repository.user.UserRepository;
 import org.userservice.security.jwt.JwtTokenProvider;
 import org.userservice.security.service.AuthService;
@@ -69,14 +71,14 @@ public class AuthServiceImpl implements AuthService {
     public JwtRefreshDtoOut refreshToken(JwtRefreshDtoIn refreshDtoIn) {
 
         if (!jwtTokenProvider.validateRefreshToken(refreshDtoIn.getRefreshToken())) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Refresh token expired");
+            throw new ForbiddenException("Refresh token expired");
         }
 
         Long id = jwtTokenProvider.getUserIdFromRefreshToken(refreshDtoIn.getRefreshToken());
 
         User user = userRepository.findById(id).orElse(null);
         if (Objects.isNull(user)) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "User not exists");
+            throw new NotFoundException("User not exists");
         }
 
         JwtRefreshDtoOut jwtRefreshDtoOut = new JwtRefreshDtoOut();
@@ -92,6 +94,6 @@ public class AuthServiceImpl implements AuthService {
         if (principal instanceof Long) {
             return userRepository.getReferenceById((Long) principal);
         }
-        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Invalid credentials");
+        throw new ForbiddenException("Invalid credentials");
     }
 }
