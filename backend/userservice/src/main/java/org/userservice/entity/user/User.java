@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
-import org.userservice.entity.userProfile.UserProfile;
+import org.userservice.entity.profile.Profile;
 
 import java.time.LocalDateTime;
 
@@ -39,6 +39,6 @@ public class User {
     private LocalDateTime updatedAt;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
-    private UserProfile profile;
+    private Profile profile;
 
 }

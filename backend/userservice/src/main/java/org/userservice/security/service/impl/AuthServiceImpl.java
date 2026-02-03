@@ -2,17 +2,15 @@ package org.userservice.security.service.impl;
 
 import jakarta.transaction.Transactional;
 import lombok.AllArgsConstructor;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 import org.userservice.dto.security.AuthenticationDtoIn;
 import org.userservice.dto.security.JwtDtoOut;
 import org.userservice.dto.security.JwtRefreshDtoIn;
 import org.userservice.dto.security.JwtRefreshDtoOut;
 import org.userservice.entity.user.User;
-import org.userservice.entity.userProfile.UserProfile;
+import org.userservice.entity.profile.Profile;
 import org.userservice.exception.BadRequestException;
 import org.userservice.exception.ForbiddenException;
 import org.userservice.exception.NotFoundException;
@@ -52,7 +50,7 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(userDtoIn.getEmail());
         user.setPassword(passwordEncoder.encode(userDtoIn.getPassword()));
 
-        UserProfile userProfile = new UserProfile();
+        Profile userProfile = new Profile();
         user.setProfile(userProfile);
         userProfile.setUser(user);
 

@@ -1,4 +1,4 @@
-package org.userservice.entity.userProfile;
+package org.userservice.entity.profile;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -17,7 +17,7 @@ import java.time.LocalDateTime;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class UserProfile {
+public class Profile {
 
     @Id
     @Column(name = "user_id")
