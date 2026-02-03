@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # 1. ZooKeeper (координатор)
   zookeeper:
-    image: confluentinc/cp-zookeeper:latest
+    image: confluentinc/cp-zookeeper:7.4.0  # Конкретная версия
     container_name: zookeeper
     restart: unless-stopped
     ports:
@@ -19,7 +19,7 @@ services:
 
   # 2. Kafka брокер
   kafka:
-    image: confluentinc/cp-kafka:latest
+    image: confluentinc/cp-kafka:7.4.0  # Конкретная версия вместо latest!
     container_name: kafka
     restart: unless-stopped
     depends_on:
@@ -66,7 +66,7 @@ services:
     depends_on:
       - kafka
     ports:
-      - "8081:8081"                # Веб-интерфейс
+      - "10010:8080"  # Исправленный порт
     environment:
       KAFKA_CLUSTERS_0_NAME: cluster
       KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
