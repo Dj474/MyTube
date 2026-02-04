@@ -8,7 +8,7 @@ import org.userservice.dto.profile.ProfileDtoOut;
 import org.userservice.service.profile.ProfileService;
 
 @RestController
-@RequestMapping("/api/profile")
+@RequestMapping("/api/v1/profile")
 @RequiredArgsConstructor
 public class ProfileController {
 
