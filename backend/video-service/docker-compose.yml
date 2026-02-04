@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  video-db:
+    image: postgres:15-alpine
+    container_name: video-service-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - video_db_data:/var/lib/postgresql/data
+    networks:
+      - video-network
+
+  # --- Хранилище S3 (MinIO) ---
+  video-minio:
+    image: minio/minio
+    container_name: minio-storage
+    restart: unless-stopped
+    ports:
+      - "9000:9000"       # API Port
+      - "9001:9001"       # Console UI Port
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
+    networks:
+      - video-network
+
+  video-service:
+    build: .
+    container_name: video-service-app
+    restart: unless-stopped
+    ports:
+      - "${VIDEO_SERVICE_PORT}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://video-db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+      # Настройки S3 для приложения
+      AWS_S3_ENDPOINT: http://minio:9000
+      AWS_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    depends_on:
+      - video-db
+      - video-minio
+    networks:
+      - video-network
+
+networks:
+  video-network:
+    driver: bridge
+
+volumes:
+  video_db_data:
+  minio_data: # Добавляем том для MinIO
