@@ -1,8 +1,6 @@
 package org.videoservice.controller.video;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
@@ -15,7 +13,7 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class VideoController {
 
-    //private final VideoService videoService;
+    private final VideoService videoService;
 
     @PostMapping("/upload")
     public VideoInfoDtoOut uploadVideo(
@@ -29,13 +27,17 @@ public class VideoController {
         // 2. Отправить файл в S3
         // 3. Отправить событие в Kafka (для обработки в HLS)
 
-        //return videoService.upload(file, title, description, userId);
-        return null;
+        return videoService.upload(file, title, description, userId);
     }
 
     @GetMapping("/{id}")
     public VideoInfoDtoOut getVideoById(@PathVariable UUID id) {
         //return videoService.getVideoById(id);
         return null;
+    }
+
+    @PostMapping("/test")
+    public String testVideo() {
+        return "good";
     }
 }

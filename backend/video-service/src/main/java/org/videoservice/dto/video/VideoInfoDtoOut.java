@@ -1,11 +1,13 @@
 package org.videoservice.dto.video;
 
+import lombok.Builder;
 import lombok.Data;
 import org.videoservice.other.enums.VideoStatus;
 
 import java.util.UUID;
 
 @Data
+@Builder
 public class VideoInfoDtoOut {
 
     private UUID id;

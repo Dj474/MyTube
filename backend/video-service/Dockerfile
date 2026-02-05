@@ -1,5 +1,5 @@
 # Этап 1: Сборка приложения
-FROM maven:3.8.4-openjdk-17 AS builder
+FROM maven:3.9.6-eclipse-temurin-21 AS builder
 
 WORKDIR /app
 
@@ -14,7 +14,7 @@ COPY src ./src
 RUN mvn clean package -Dmaven.test.skip=true
 
 # Этап 2: Финальный образ
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:21-jre
 
 # Создаем непривилегированного пользователя для безопасности
 RUN addgroup --system --gid 1001 spring && \

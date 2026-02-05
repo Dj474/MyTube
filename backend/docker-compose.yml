@@ -52,6 +52,7 @@ services:
       - kafka_data:/var/lib/kafka/data
     networks:
       - kafka-network
+      - main-network
     healthcheck:
       test: ["CMD", "kafka-topics", "--bootstrap-server", "localhost:9092", "--list"]
       interval: 30s
@@ -83,3 +84,6 @@ volumes:
 networks:
   kafka-network:
     driver: bridge
+  main-network:
+    driver: bridge
+    name: shared-network

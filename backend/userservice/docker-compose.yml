@@ -38,10 +38,15 @@ services:
       - user-db
     networks:
       - user-network
+      - shared-network
 
 networks:
   user-network:
     driver: bridge
+  shared-network:
+    driver: bridge
+    external: true
+    name: shared-network
 
 volumes:
   user_db_data:

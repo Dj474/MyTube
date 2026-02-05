@@ -39,6 +39,8 @@ services:
     restart: unless-stopped
     ports:
       - "${VIDEO_SERVICE_PORT}:8080"
+    env_file:
+      - .env
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
       SPRING_DATASOURCE_URL: jdbc:postgresql://video-db:5432/${DB_NAME}
@@ -46,17 +48,22 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
       # Настройки S3 для приложения
       AWS_S3_ENDPOINT: http://minio:9000
-      AWS_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
-      AWS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_ACCESS_KEY: ${MINIO_ROOT_USER}
+      AWS_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
     depends_on:
       - video-db
       - video-minio
     networks:
       - video-network
+      - shared-network
 
 networks:
   video-network:
     driver: bridge
+  shared-network:
+    driver: bridge
+    external: true
+    name: shared-network
 
 volumes:
   video_db_data:
