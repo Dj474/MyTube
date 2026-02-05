@@ -7,7 +7,9 @@ import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
 import org.videoservice.entity.video.Video;
 import org.videoservice.other.enums.VideoStatus;
+import org.videoservice.other.record.kafka.VideoUploadEvent;
 import org.videoservice.repository.video.VideoRepository;
+import org.videoservice.service.kafka.KafkaProducerService;
 import org.videoservice.service.minio.StorageService;
 
 import java.util.UUID;
@@ -18,7 +20,7 @@ public class VideoService {
 
     private final VideoRepository videoRepository;
     private final StorageService storageService;
-    // private final KafkaTemplate kafkaTemplate; // Добавим позже
+    private final KafkaProducerService kafkaProducerService;
 
     @Transactional
     public VideoInfoDtoOut upload(MultipartFile file, String title, String description, Long userId) {
@@ -43,6 +45,8 @@ public class VideoService {
         storageService.uploadFile(file, s3Key);
 
         // 4. TODO: Отправить сообщение в Kafka для обработки
+        VideoUploadEvent videoUploadEvent = new VideoUploadEvent(videoId, s3Key, title);
+        kafkaProducerService.sendUploadEvent(videoUploadEvent);
 
         return mapToResponse(video);
     }
