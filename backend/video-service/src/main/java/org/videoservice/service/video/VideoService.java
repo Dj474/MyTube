@@ -27,7 +27,7 @@ public class VideoService {
         UUID videoId = UUID.randomUUID();
 
         // 1. Формируем путь (ключ) для S3
-        String s3Key = String.format("temp/raw/%s-%s", videoId, file.getOriginalFilename());
+        String s3Key = String.format("%s-%s", videoId, file.getOriginalFilename());
 
         // 2. Сохраняем метаданные в БД
         Video video = Video.builder()

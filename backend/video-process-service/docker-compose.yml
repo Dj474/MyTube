@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  video-process-app:
+    build: .
+    container_name: video-process-service-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      # Подключение к Kafka (используем имя сервиса из shared-network)
+      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+
+      # Подключение к MinIO
+      AWS_S3_ENDPOINT: http://minio-storage:9000
+      AWS_ACCESS_KEY: ${MINIO_ROOT_USER}
+      AWS_SECRET_KEY: ${MINIO_ROOT_PASSWORD}
+
+      SPRING_DATASOURCE_URL: jdbc:postgresql://video-db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      # Профиль для Docker
+      SPRING_PROFILES_ACTIVE: docker
+
+    networks:
+      - shared-network
+
+networks:
+  shared-network:
+    driver: bridge
+    external: true
+    name: shared-network

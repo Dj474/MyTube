@@ -15,6 +15,7 @@ services:
       - video_db_data:/var/lib/postgresql/data
     networks:
       - video-network
+      - shared-network
 
   # --- Хранилище S3 (MinIO) ---
   video-minio:
@@ -32,6 +33,7 @@ services:
     command: server /data --console-address ":9001"
     networks:
       - video-network
+      - shared-network
 
   video-service:
     build: .
