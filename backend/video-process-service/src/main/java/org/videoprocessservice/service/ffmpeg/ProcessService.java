@@ -1,4 +1,4 @@
-package org.videoprocessservice.service.video;
+package org.videoprocessservice.service.ffmpeg;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,7 +20,7 @@ public class ProcessService {
 
     private final StorageService storageService;
 
-    public void processVideoTask(String fileKey, UUID videoId) {
+    public boolean processVideoTask(String fileKey, UUID videoId) {
         // Создаем уникальные имена для временных файлов
         Path tempDir = Paths.get(System.getProperty("java.io.tmpdir"));
         File inputFile = tempDir.resolve("raw_" + fileKey).toFile();
@@ -32,16 +32,16 @@ public class ProcessService {
             try {
                 executeFFmpeg(inputFile, outputFile, size);
                 storageService.upload(outputFile, videoId + "/" + size + ".mp4");
+                if (outputFile.exists()) outputFile.delete();
             } catch (Exception e) {
                 log.error(e.getMessage());
-            }
-            finally {
                 if (outputFile.exists()) outputFile.delete();
-
+                if (inputFile.exists()) inputFile.delete();
+                return false;
             }
-
         }
         if (inputFile.exists()) inputFile.delete();
+        return true;
     }
 
     private void executeFFmpeg(File input, File output, int height) throws IOException, InterruptedException {
@@ -80,7 +80,4 @@ public class ProcessService {
 //                java.nio.file.StandardCopyOption.REPLACE_EXISTING
 //        );
     }
-
-
-
 }

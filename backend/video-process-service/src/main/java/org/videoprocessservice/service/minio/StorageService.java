@@ -38,4 +38,12 @@ public class StorageService {
             throw new RuntimeException(e);
         }
     }
+
+    public void deleteInput(String key) {
+        s3Client.deleteObject(downloadBucket, key);
+    }
+
+    public void deleteOutput(String key) {
+        s3Client.deleteObject(uploadBucket, key);
+    }
 }

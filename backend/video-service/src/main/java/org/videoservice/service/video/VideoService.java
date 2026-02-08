@@ -44,9 +44,13 @@ public class VideoService {
         // 3. Загружаем сам файл в MinIO
         storageService.uploadFile(file, s3Key);
 
-        // 4. TODO: Отправить сообщение в Kafka для обработки
+        video.setStatus(VideoStatus.PROCESSING);
+
+        // 4. Отправить сообщение в Kafka для обработки
         VideoUploadEvent videoUploadEvent = new VideoUploadEvent(videoId, s3Key, title);
         kafkaProducerService.sendUploadEvent(videoUploadEvent);
+
+        videoRepository.save(video);
 
         return mapToResponse(video);
     }
