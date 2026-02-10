@@ -12,6 +12,8 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -63,7 +65,14 @@ public class ProcessServiceHlsImpl implements ProcessService {
 
         storageService.download(inputFile, fileKey);
 
-        for(int size = 360; size <= 1080; size += 360) {
+        List<Integer> resolutions = new ArrayList<>();
+        resolutions.add(360);
+        resolutions.add(720);
+        resolutions.add(1080);
+
+        createMasterPlaylist(videoId, resolutions);
+
+        for(int size : resolutions) {
             File outputFile = tempDir.resolve("proc_" + size + "_" + fileKey).toFile();
             try {
                 File outputFolder = tempDir.resolve("hls_" + size + "_" + videoId).toFile();
@@ -79,5 +88,23 @@ public class ProcessServiceHlsImpl implements ProcessService {
         }
         if (inputFile.exists()) inputFile.delete();
         return true;
+    }
+
+    private void createMasterPlaylist(UUID videoId, List<Integer> resolutions) {
+        StringBuilder m3u8 = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:3\n\n");
+
+        for (int res : resolutions) {
+            // Рассчитываем примерный битрейт (в битах в секунду)
+            int bandwidth = (res == 1080) ? 5000000 : (res == 720) ? 2800000 : 800000;
+            String resolutionStr = (res == 1080) ? "1920x1080" : (res == 720) ? "1280x720" : "640x360";
+
+            m3u8.append("#EXT-X-STREAM-INF:BANDWIDTH=").append(bandwidth)
+                    .append(",RESOLUTION=").append(resolutionStr)
+                    .append("\n")
+                    .append(res).append("/index.m3u8\n"); // Относительный путь!
+        }
+
+        // Загружаем готовую строку как байты в корень папки видео
+        storageService.uploadBytes(m3u8.toString().getBytes(), videoId + "/master.m3u8");
     }
 }

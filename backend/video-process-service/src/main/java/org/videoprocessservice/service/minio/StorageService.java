@@ -2,6 +2,7 @@ package org.videoprocessservice.service.minio;
 
 import com.amazonaws.services.s3.AmazonS3;
 import com.amazonaws.services.s3.model.GetObjectRequest;
+import com.amazonaws.services.s3.model.ObjectMetadata;
 import com.amazonaws.services.s3.model.PutObjectRequest;
 import com.amazonaws.services.s3.model.S3Object;
 import lombok.RequiredArgsConstructor;
@@ -54,6 +55,19 @@ public class StorageService {
                 String s3Key = videoId + "/" + size + "/" + f.getName();
                 upload(f, s3Key);
             }
+        }
+    }
+
+    public void uploadBytes(byte[] data, String key) {
+        ObjectMetadata metadata = new ObjectMetadata();
+        metadata.setContentLength(data.length);
+        metadata.setContentType("application/x-mpegURL"); // Важно для HLS плейлистов
+
+        try (InputStream inputStream = new ByteArrayInputStream(data)) {
+            s3Client.putObject(new PutObjectRequest(uploadBucket, key, inputStream, metadata));
+            log.info("Master playlist uploaded to S3: {}", key);
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to upload bytes to S3", e);
         }
     }
 }
