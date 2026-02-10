@@ -10,6 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.*;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -45,5 +46,14 @@ public class StorageService {
 
     public void deleteOutput(String key) {
         s3Client.deleteObject(uploadBucket, key);
+    }
+
+    public void uploadFolder(File[] files, UUID videoId, int size) {
+        if (files != null) {
+            for (File f : files) {
+                String s3Key = videoId + "/" + size + "/" + f.getName();
+                upload(f, s3Key);
+            }
+        }
     }
 }
