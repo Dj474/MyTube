@@ -1,7 +1,6 @@
 package org.videoprocessservice.service.video;
 
 import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.videoprocessservice.entity.video.Video;
@@ -10,6 +9,7 @@ import org.videoprocessservice.service.ffmpeg.ProcessService;
 import org.videoprocessservice.service.minio.StorageService;
 import org.videoprocessservice.video.VideoRepository;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -36,14 +36,16 @@ public class VideoService {
         video.setStatus(VideoStatus.PROCESSING);
         videoRepository.save(video);
 
-        if (!processService.processVideoTask(video.getS3Key(), video.getId())) {
+        Map<String, String> s3Keys = processService.processVideoTask(video.getS3Key(), video.getId());
+        if (s3Keys == null) {
             storageService.deleteOutput(video.getId().toString());
             video.setStatus(VideoStatus.ERROR);
         }
         else {
             storageService.deleteInput(video.getS3Key());
             video.setStatus(VideoStatus.READY);
-            video.setS3Key(video.getId().toString());
+            video.setS3Key(s3Keys.get("videoUrl"));
+            video.setThumbnailUrl(s3Keys.get("thumbUrl"));
         }
         videoRepository.save(video);
     }

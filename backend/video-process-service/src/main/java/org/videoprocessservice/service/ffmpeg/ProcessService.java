@@ -1,9 +1,10 @@
 package org.videoprocessservice.service.ffmpeg;
 
+import java.util.Map;
 import java.util.UUID;
 
 public interface ProcessService {
 
-    boolean processVideoTask(String fileKey, UUID videoId);
+    Map<String, String> processVideoTask(String fileKey, UUID videoId);
 
 }

@@ -26,6 +26,12 @@ public class StorageService {
     @Value("${app.s3.upload_bucket}")
     private String uploadBucket;
 
+    @Value("${app.s3.endpoint}")
+    private String s3Endpoint;
+
+    @Value("${app.s3.thumbnail_bucket}")
+    private String thumbnailBucket;
+
     public void upload(File file, String key) {
         s3Client.putObject(new PutObjectRequest(uploadBucket, key, file));
     }
@@ -58,7 +64,7 @@ public class StorageService {
         }
     }
 
-    public void uploadBytes(byte[] data, String key) {
+    public String uploadBytes(byte[] data, String key) {
         ObjectMetadata metadata = new ObjectMetadata();
         metadata.setContentLength(data.length);
         metadata.setContentType("application/x-mpegURL"); // Важно для HLS плейлистов
@@ -69,5 +75,12 @@ public class StorageService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload bytes to S3", e);
         }
+        return s3Endpoint + "/" + uploadBucket + "/" + key;
+    }
+
+    public String uploadThumbnail(UUID videoId, File file) {
+        String key = videoId.toString() + ".jpg";
+        s3Client.putObject(new PutObjectRequest(thumbnailBucket, key, file));
+        return key;
     }
 }

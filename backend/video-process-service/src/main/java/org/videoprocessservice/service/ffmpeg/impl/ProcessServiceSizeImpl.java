@@ -12,6 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.Map;
 import java.util.UUID;
 
 @Service
@@ -22,7 +23,7 @@ public class ProcessServiceSizeImpl implements ProcessService {
     private final StorageService storageService;
 
     @Override
-    public boolean processVideoTask(String fileKey, UUID videoId) {
+    public Map<String, String> processVideoTask(String fileKey, UUID videoId) {
         // Создаем уникальные имена для временных файлов
         Path tempDir = Paths.get(System.getProperty("java.io.tmpdir"));
         File inputFile = tempDir.resolve("raw_" + fileKey).toFile();
@@ -39,11 +40,11 @@ public class ProcessServiceSizeImpl implements ProcessService {
                 log.error(e.getMessage());
                 if (outputFile.exists()) outputFile.delete();
                 if (inputFile.exists()) inputFile.delete();
-                return false;
+                return null;
             }
         }
         if (inputFile.exists()) inputFile.delete();
-        return true;
+        return null;
     }
 
     private void executeFFmpeg(File input, File output, int height) throws IOException, InterruptedException {

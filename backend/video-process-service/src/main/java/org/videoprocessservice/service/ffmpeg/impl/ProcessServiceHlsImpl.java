@@ -12,9 +12,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -59,9 +57,12 @@ public class ProcessServiceHlsImpl implements ProcessService {
     }
 
     @Override
-    public boolean processVideoTask(String fileKey, UUID videoId) {
+    public Map<String, String> processVideoTask(String fileKey, UUID videoId) {
         Path tempDir = Paths.get(System.getProperty("java.io.tmpdir"));
         File inputFile = tempDir.resolve("raw_" + fileKey).toFile();
+        File thumbFile = new File(System.getProperty("java.io.tmpdir"), videoId + ".jpg");
+
+        Map<String, String> map = new HashMap<>();
 
         storageService.download(inputFile, fileKey);
 
@@ -70,27 +71,28 @@ public class ProcessServiceHlsImpl implements ProcessService {
         resolutions.add(720);
         resolutions.add(1080);
 
-        createMasterPlaylist(videoId, resolutions);
-
         for(int size : resolutions) {
             File outputFile = tempDir.resolve("proc_" + size + "_" + fileKey).toFile();
             try {
                 File outputFolder = tempDir.resolve("hls_" + size + "_" + videoId).toFile();
                 executeFFmpegHls(inputFile, outputFolder, size);
                 storageService.uploadFolder(outputFolder.listFiles(), videoId, size);
+                createPreviev(inputFile, thumbFile);
+                map.put("thumbUrl", storageService.uploadThumbnail(videoId, thumbFile));
                 if (outputFile.exists()) outputFile.delete();
             } catch (Exception e) {
                 log.error(e.getMessage());
                 if (outputFile.exists()) outputFile.delete();
                 if (inputFile.exists()) inputFile.delete();
-                return false;
+                return null;
             }
         }
         if (inputFile.exists()) inputFile.delete();
-        return true;
+        map.put("videoUrl", createMasterPlaylist(videoId, resolutions));
+        return map;
     }
 
-    private void createMasterPlaylist(UUID videoId, List<Integer> resolutions) {
+    private String createMasterPlaylist(UUID videoId, List<Integer> resolutions) {
         StringBuilder m3u8 = new StringBuilder("#EXTM3U\n#EXT-X-VERSION:3\n\n");
 
         for (int res : resolutions) {
@@ -105,6 +107,25 @@ public class ProcessServiceHlsImpl implements ProcessService {
         }
 
         // Загружаем готовую строку как байты в корень папки видео
-        storageService.uploadBytes(m3u8.toString().getBytes(), videoId + "/master.m3u8");
+        return storageService.uploadBytes(m3u8.toString().getBytes(), videoId + "/master.m3u8");
+    }
+
+    private void createPreviev(File localVideoFile, File thumbFile) throws IOException, InterruptedException {
+
+        ProcessBuilder pb = new ProcessBuilder(
+                "ffmpeg", "-y", "-ss", "00:00:01",
+                "-i", localVideoFile.getAbsolutePath(),
+                "-frames:v", "1",
+                "-q:v", "2",
+                thumbFile.getAbsolutePath()
+        );
+
+        Process process = pb.start();
+        int exitCode = process.waitFor();
+
+        if (exitCode != 0) {
+            throw new RuntimeException("FFmpeg failed for create thumbnail");
+        }
+
     }
 }
