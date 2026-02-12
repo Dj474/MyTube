@@ -6,6 +6,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
 import org.videoservice.entity.video.Video;
+import org.videoservice.mapper.video.VideoMapper;
 import org.videoservice.other.enums.VideoStatus;
 import org.videoservice.other.record.kafka.VideoUploadEvent;
 import org.videoservice.repository.video.VideoRepository;
@@ -21,6 +22,7 @@ public class VideoService {
     private final VideoRepository videoRepository;
     private final StorageService storageService;
     private final KafkaProducerService kafkaProducerService;
+    private final VideoMapper videoMapper;
 
     @Transactional
     public VideoInfoDtoOut upload(MultipartFile file, String title, String description, Long userId) {
@@ -52,16 +54,7 @@ public class VideoService {
 
         videoRepository.save(video);
 
-        return mapToResponse(video);
+        return videoMapper.toDto(video);
     }
 
-    private VideoInfoDtoOut mapToResponse(Video video) {
-        return VideoInfoDtoOut.builder()
-                .id(video.getId())
-                .title(video.getTitle())
-                .status(video.getStatus())
-                .s3Key(video.getS3Key())
-                .userId(video.getUserId())
-                .build();
-    }
 }
