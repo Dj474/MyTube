@@ -10,6 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.io.InputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -20,6 +21,12 @@ public class StorageService {
 
     @Value("${app.s3.bucket-name}")
     private String bucketName;
+
+    @Value("${app.s3.process_bucket}")
+    private String processBucket;
+
+    @Value("${app.s3.thumbnail_bucket}")
+    private String thumbnailBucket;
 
     public String uploadFile(MultipartFile file, String key) {
         try {
@@ -36,5 +43,9 @@ public class StorageService {
             log.error("Ошибка при чтении файла для S3", e);
             throw new RuntimeException("Failed to upload file to S3", e);
         }
+    }
+
+    public InputStream getThumbnailInputStream(String fileName) {
+        return s3Client.getObject(thumbnailBucket, fileName).getObjectContent();
     }
 }

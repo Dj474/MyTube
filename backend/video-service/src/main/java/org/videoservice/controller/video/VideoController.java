@@ -1,10 +1,14 @@
 package org.videoservice.controller.video;
 
+import org.springframework.core.io.Resource;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
 import org.videoservice.service.video.VideoService;
+import org.videoservice.specification.PageableParams;
 
 import java.util.UUID;
 
@@ -36,8 +40,14 @@ public class VideoController {
         return null;
     }
 
-    @PostMapping("/test")
-    public String testVideo() {
-        return "good";
+    @GetMapping()
+    public Page<VideoInfoDtoOut> getVideos(@RequestBody PageableParams params) {
+        return videoService.getVideos(params);
     }
+
+    @GetMapping("/previev/{videoId}")
+    public ResponseEntity<Resource> getThumbnail(@PathVariable UUID videoId) {
+        return videoService.getThumbnail(videoId);
+    }
+
 }
