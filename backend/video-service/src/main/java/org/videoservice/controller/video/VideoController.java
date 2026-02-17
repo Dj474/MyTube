@@ -36,8 +36,7 @@ public class VideoController {
 
     @GetMapping("/{id}")
     public VideoInfoDtoOut getVideoById(@PathVariable UUID id) {
-        //return videoService.getVideoById(id);
-        return null;
+        return videoService.getVideoById(id);
     }
 
     @GetMapping()

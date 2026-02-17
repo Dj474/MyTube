@@ -1,7 +1,6 @@
 package org.videoservice.service.video;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
@@ -15,7 +14,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
 import org.videoservice.entity.video.Video;
 import org.videoservice.entity.video.Video_;
-import org.videoservice.exception.BadRequestException;
 import org.videoservice.mapper.video.VideoMapper;
 import org.videoservice.other.enums.VideoStatus;
 import org.videoservice.other.record.kafka.VideoUploadEvent;
@@ -76,13 +74,17 @@ public class VideoService {
     }
 
     public ResponseEntity<Resource> getThumbnail(UUID videoId) {
-        Video video = videoRepository.findById(videoId).orElse(null);
-        if (video == null) throw new BadRequestException("video with id " + videoId + "not found");
+        Video video = videoRepository.byId(videoId);
         InputStream is = storageService.getThumbnailInputStream(video.getThumbnailUrl());
         Resource res = new InputStreamResource(is);
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG)
                 .body(res);
+    }
+
+    public VideoInfoDtoOut getVideoById(UUID id) {
+        Video video = videoRepository.byId(id);
+        return videoMapper.toDto(video);
     }
 
 }
