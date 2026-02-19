@@ -1,6 +1,5 @@
 package org.userservice.service.subscription;
 
-import jdk.jshell.JShell;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -10,8 +9,11 @@ import org.userservice.entity.subscription.Subscription;
 import org.userservice.entity.user.User;
 import org.userservice.exception.NotFoundException;
 import org.userservice.mapper.subscription.SubscriptionMapper;
+import org.userservice.other.enums.kafka.SubscriptionAction;
+import org.userservice.other.record.kafka.UserSubscriptionEvent;
 import org.userservice.repository.subscription.SubscriptionRepository;
 import org.userservice.repository.user.UserRepository;
+import org.userservice.service.kafka.KafkaProducerService;
 import org.userservice.service.user.UserService;
 import org.userservice.specification.PageableParams;
 
@@ -23,6 +25,7 @@ public class SubscriptionService {
     private final UserService userService;
     private final UserRepository userRepository;
     private final SubscriptionMapper subscriptionMapper;
+    private final KafkaProducerService kafkaProducerService;
 
     public void subscribe(Long authorId) {
         User current = userService.getCurrent();
@@ -33,6 +36,7 @@ public class SubscriptionService {
         subscription.setFollower(current);
         subscription.setAuthor(author);
         subscriptionRepository.save(subscription);
+        kafkaProducerService.sendUploadEvent(new UserSubscriptionEvent(current.getId(), author.getId(), SubscriptionAction.SUBSCRIBE));
 
     }
 
@@ -45,6 +49,8 @@ public class SubscriptionService {
                 .orElseThrow(() -> new NotFoundException("subscription not found"));
 
         subscriptionRepository.delete(subscription);
+
+        kafkaProducerService.sendUploadEvent(new UserSubscriptionEvent(current.getId(), author.getId(), SubscriptionAction.UNSUBSCRIBE));
     }
 
     public Page<SubscriptionDtoOut> getSubscriptions(PageableParams params) {
