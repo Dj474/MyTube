@@ -9,7 +9,7 @@ import org.userservice.entity.subscription.Subscription;
 public interface SubscriptionMapper {
 
     @Mapping(target = "authorId", source = "subscription.author.id")
-    @Mapping(target = "nickname", source = "subscription.author.name")
+    @Mapping(target = "nickname", source = "subscription.author.username")
     SubscriptionDtoOut toDto(Subscription subscription);
 
 }
