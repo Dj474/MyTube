@@ -44,6 +44,11 @@ public class VideoController {
         return videoService.getVideos(params);
     }
 
+    @GetMapping("/my")
+    public Page<VideoInfoDtoOut> getMyVideos(@RequestBody PageableParams params, @RequestHeader("X-User-Id") Long userId) {
+        return videoService.getMyVideos(params, userId);
+    }
+
     @GetMapping("/previev/{videoId}")
     public ResponseEntity<Resource> getThumbnail(@PathVariable UUID videoId) {
         return videoService.getThumbnail(videoId);

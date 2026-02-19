@@ -69,7 +69,13 @@ public class VideoService {
 
     public Page<VideoInfoDtoOut> getVideos(PageableParams params) {
         Pageable pageable = params.toPageable(Sort.by(Sort.Direction.DESC, Video_.CREATED_AT));
-        Page<Video> page = videoRepository.findAll(pageable);
+        Page<Video> page = videoRepository.findByStatus(VideoStatus.READY, pageable);
+        return page.map(videoMapper::toDto);
+    }
+
+    public Page<VideoInfoDtoOut> getMyVideos(PageableParams params, Long userId) {
+        Pageable pageable = params.toPageable(Sort.by(Sort.Direction.DESC, Video_.CREATED_AT));
+        Page<Video> page = videoRepository.findByUserId(userId, pageable);
         return page.map(videoMapper::toDto);
     }
 
