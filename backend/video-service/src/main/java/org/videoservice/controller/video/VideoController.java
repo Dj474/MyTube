@@ -54,4 +54,9 @@ public class VideoController {
         return videoService.getThumbnail(videoId);
     }
 
+    @GetMapping("/subscription")
+    public Page<VideoInfoDtoOut> getSubscriptionVideos(@RequestBody PageableParams params, @RequestHeader("X-User-Id") Long userId) {
+        return videoService.getSubscriptionVideos(params, userId);
+    }
+
 }

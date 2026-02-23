@@ -21,6 +21,7 @@ import org.videoservice.repository.video.VideoRepository;
 import org.videoservice.service.kafka.KafkaProducerService;
 import org.videoservice.service.minio.StorageService;
 import org.videoservice.specification.PageableParams;
+import org.videoservice.specification.video.VideoSpecification;
 
 import java.io.InputStream;
 import java.util.UUID;
@@ -91,6 +92,13 @@ public class VideoService {
     public VideoInfoDtoOut getVideoById(UUID id) {
         Video video = videoRepository.byId(id);
         return videoMapper.toDto(video);
+    }
+
+    public Page<VideoInfoDtoOut> getSubscriptionVideos(PageableParams params, Long userId) {
+        Pageable pageable = params.toPageable(Sort.by(Sort.Direction.DESC, Video_.CREATED_AT));
+        VideoSpecification specification = new VideoSpecification(userId);
+        Page<Video> page = videoRepository.findAll(specification, pageable);
+        return page.map(videoMapper::toDto);
     }
 
 }
