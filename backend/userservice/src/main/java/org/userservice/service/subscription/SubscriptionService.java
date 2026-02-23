@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.userservice.dto.subscription.SubscriptionDtoOut;
 import org.userservice.entity.subscription.Subscription;
 import org.userservice.entity.user.User;
+import org.userservice.exception.BadRequestException;
 import org.userservice.exception.NotFoundException;
 import org.userservice.mapper.subscription.SubscriptionMapper;
 import org.userservice.other.enums.kafka.SubscriptionAction;
@@ -31,6 +32,9 @@ public class SubscriptionService {
         User current = userService.getCurrent();
 
         User author = userRepository.byId(authorId);
+
+        if (subscriptionRepository.existsByFollowerAndAuthor(current, author))
+            throw new BadRequestException("subscription already exists");
 
         Subscription subscription = new Subscription();
         subscription.setFollower(current);

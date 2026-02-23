@@ -15,6 +15,8 @@ public interface SubscriptionRepository extends JpaRepository<Subscription, UUID
 
     Optional<Subscription> findByFollowerAndAuthor(User follower, User author);
 
+    boolean existsByFollowerAndAuthor(User follower, User author);
+
     Page<Subscription> findByFollower(User user, Pageable pageable);
 
 }
