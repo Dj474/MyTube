@@ -19,6 +19,8 @@ public class VideoService {
     private final StorageService storageService;
     private final ProcessService processService;
 
+    private final String THUMBNAIL_URL = "http://localhost:8090/api/v1/videos/previev/";
+
     public VideoService(VideoRepository videoRepository,
                         StorageService storageService,
                         @Qualifier("processServiceHlsImpl") ProcessService processService) {
@@ -45,7 +47,7 @@ public class VideoService {
             storageService.deleteInput(video.getS3Key());
             video.setStatus(VideoStatus.READY);
             video.setS3Key(s3Keys.get("videoUrl"));
-            video.setThumbnailUrl("/api/v1/videos/previev/" + video.getId().toString());
+            video.setThumbnailUrl(THUMBNAIL_URL + video.getId().toString());
         }
         videoRepository.save(video);
     }
