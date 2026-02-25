@@ -8,8 +8,6 @@ services:
     env_file:
       - .env
     environment:
-      # Подключение к Kafka (используем имя сервиса из shared-network)
-      SPRING_KAFKA_BOOTSTRAP_SERVERS: kafka:9092
 
       # Подключение к MinIO
       AWS_S3_ENDPOINT: http://minio-storage:9000
