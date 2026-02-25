@@ -7,8 +7,10 @@ import lombok.NoArgsConstructor;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.userservice.entity.profile.Profile;
+import org.userservice.entity.subscription.Subscription;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Entity
 @Table(name = "users")
@@ -40,5 +42,11 @@ public class User {
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL)
     private Profile profile;
+
+    @OneToMany(mappedBy = "follower")
+    private List<Subscription> subscriptions;
+
+    @OneToMany(mappedBy = "author")
+    private List<Subscription> followers;
 
 }
