@@ -45,7 +45,7 @@ public class VideoService {
             storageService.deleteInput(video.getS3Key());
             video.setStatus(VideoStatus.READY);
             video.setS3Key(s3Keys.get("videoUrl"));
-            video.setThumbnailUrl(s3Keys.get("thumbUrl"));
+            video.setThumbnailUrl("/api/v1/videos/previev/" + video.getId().toString());
         }
         videoRepository.save(video);
     }
