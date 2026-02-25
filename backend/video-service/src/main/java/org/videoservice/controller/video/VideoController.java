@@ -40,12 +40,12 @@ public class VideoController {
     }
 
     @GetMapping()
-    public Page<VideoInfoDtoOut> getVideos(@RequestBody PageableParams params) {
+    public Page<VideoInfoDtoOut> getVideos(PageableParams params) {
         return videoService.getVideos(params);
     }
 
     @GetMapping("/my")
-    public Page<VideoInfoDtoOut> getMyVideos(@RequestBody PageableParams params, @RequestHeader("X-User-Id") Long userId) {
+    public Page<VideoInfoDtoOut> getMyVideos(PageableParams params, @RequestHeader("X-User-Id") Long userId) {
         return videoService.getMyVideos(params, userId);
     }
 
@@ -55,7 +55,7 @@ public class VideoController {
     }
 
     @GetMapping("/subscription")
-    public Page<VideoInfoDtoOut> getSubscriptionVideos(@RequestBody PageableParams params, @RequestHeader("X-User-Id") Long userId) {
+    public Page<VideoInfoDtoOut> getSubscriptionVideos(PageableParams params, @RequestHeader("X-User-Id") Long userId) {
         return videoService.getSubscriptionVideos(params, userId);
     }
 
