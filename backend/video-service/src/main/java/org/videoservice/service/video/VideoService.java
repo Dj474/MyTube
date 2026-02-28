@@ -89,9 +89,9 @@ public class VideoService {
                 .body(res);
     }
 
-    public VideoInfoDtoOut getVideoById(UUID id) {
+    public VideoInfoDtoOut getVideoById(UUID id, Long userId) {
         Video video = videoRepository.byId(id);
-        return videoMapper.toDto(video);
+        return videoMapper.toDtoWithLikes(video, userId);
     }
 
     public Page<VideoInfoDtoOut> getSubscriptionVideos(PageableParams params, Long userId) {
