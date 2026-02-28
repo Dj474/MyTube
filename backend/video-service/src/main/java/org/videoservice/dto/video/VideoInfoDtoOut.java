@@ -18,4 +18,7 @@ public class VideoInfoDtoOut {
     private String thumbnailUrl;
     private Long userId;
 
+    private Long amountOfLikes = 0L;
+    private Boolean isLiked = false;
+
 }

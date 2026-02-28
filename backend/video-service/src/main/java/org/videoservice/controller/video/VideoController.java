@@ -35,8 +35,9 @@ public class VideoController {
     }
 
     @GetMapping("/{id}")
-    public VideoInfoDtoOut getVideoById(@PathVariable UUID id) {
-        return videoService.getVideoById(id);
+    public VideoInfoDtoOut getVideoById(@PathVariable UUID id,
+                                        @RequestHeader("X-User-Id") Long userId) {
+        return videoService.getVideoById(id, userId);
     }
 
     @GetMapping()
