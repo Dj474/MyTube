@@ -6,6 +6,8 @@ import org.commentservice.dto.comment.CommentDtoIn;
 import org.commentservice.dto.comment.CommentDtoOut;
 import org.commentservice.dto.comment.CommentUpdateDtoIn;
 import org.commentservice.service.comment.CommentService;
+import org.commentservice.specification.PageableParams;
+import org.springframework.data.domain.Page;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -37,5 +39,12 @@ public class CommentController {
             @PathVariable UUID id,
             @RequestHeader("X-User-Id") Long userId) {
         commentService.delete(id, userId);
+    }
+
+    @GetMapping("/{videoId}")
+    public Page<CommentDtoOut> getCommentsForVideo(@PathVariable UUID videoId,
+                                                   @RequestHeader("X-User-Id") Long userId,
+                                                   PageableParams params) {
+        return commentService.getCommentsForVideo(videoId, userId, params);
     }
 }

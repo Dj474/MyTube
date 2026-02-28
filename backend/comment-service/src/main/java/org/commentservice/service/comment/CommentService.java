@@ -9,6 +9,9 @@ import org.commentservice.exception.ForbiddenException;
 import org.commentservice.exception.NotFoundException;
 import org.commentservice.mapper.comment.CommentMapper;
 import org.commentservice.repository.comment.CommentRepository;
+import org.commentservice.specification.PageableParams;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 
 import java.util.UUID;
@@ -50,5 +53,11 @@ public class CommentService {
         }
 
         commentRepository.delete(comment);
+    }
+
+    public Page<CommentDtoOut> getCommentsForVideo(UUID videoId, Long userId, PageableParams params) {
+        Pageable pageable = params.toPageable();
+        Page<Comment> page = commentRepository.findByVideoId(videoId, pageable);
+        return page.map(comment -> commentMapper.toDtoWithLikes(comment, userId));
     }
 }
