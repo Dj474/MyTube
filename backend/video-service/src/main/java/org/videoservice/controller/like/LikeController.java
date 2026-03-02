@@ -7,7 +7,7 @@ import org.videoservice.service.like.LikeService;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/comment/like")
+@RequestMapping("/api/v1/video/like")
 @RequiredArgsConstructor
 public class LikeController {
 
