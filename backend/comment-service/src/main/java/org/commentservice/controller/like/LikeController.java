@@ -7,7 +7,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.UUID;
 
 @RestController
-@RequestMapping("/api/v1/comment/like")
+@RequestMapping("/api/v1/comments/like")
 @RequiredArgsConstructor
 public class LikeController {
 
