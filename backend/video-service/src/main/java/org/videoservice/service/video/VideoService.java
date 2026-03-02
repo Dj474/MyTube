@@ -82,7 +82,7 @@ public class VideoService {
 
     public ResponseEntity<Resource> getThumbnail(UUID videoId) {
         Video video = videoRepository.byId(videoId);
-        InputStream is = storageService.getThumbnailInputStream(video.getThumbnailUrl());
+        InputStream is = storageService.getThumbnailInputStream(video.getId() + ".jpg");
         Resource res = new InputStreamResource(is);
         return ResponseEntity.ok()
                 .contentType(MediaType.IMAGE_JPEG)
