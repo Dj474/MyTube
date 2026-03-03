@@ -8,7 +8,6 @@ const Auth = () => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Выбираем эндпоинт в зависимости от режима
     const endpoint = isLogin ? 'signin' : 'register';
     const url = `http://localhost:8090/api/v1/auth/${endpoint}`;
 
@@ -18,11 +17,9 @@ const Auth = () => {
       
       console.log("Ответ сервера:", response.data);
 
-      // Извлекаем все необходимые поля из ответа
       const { accessToken, refreshToken, id } = response.data;
 
       if (accessToken) {
-        // --- ВАЖНО: сохраняем оба токена для работы интерцептора ---
         localStorage.setItem('token', accessToken);
         localStorage.setItem('refreshToken', refreshToken); 
         localStorage.setItem('userId', id);
@@ -30,7 +27,6 @@ const Auth = () => {
         console.log("Успех! Переходим в Студию.");
         window.location.href = '/'; 
       } else if (!isLogin) {
-        // Если регистрация прошла без выдачи токена (зависит от логики бэкенда)
         alert("Регистрация успешна! Теперь используйте свои данные для входа.");
         setIsLogin(true);
       }
@@ -63,12 +59,14 @@ const Auth = () => {
           )}
           
           <div className="input-group">
-            <label>Email</label>
+            {/* Меняем лейбл для наглядности */}
+            <label>{isLogin ? 'Email или Имя пользователя' : 'Email'}</label>
             <input 
-              type="email" 
+              /* ВАЖНО: type="text" убирает встроенную проверку браузера на @ */
+              type="text" 
               value={formData.email}
               onChange={(e) => setFormData({...formData, email: e.target.value})} 
-              placeholder="example@mail.com"
+              placeholder={isLogin ? "example@mail.com или username" : "example@mail.com"}
               required 
             />
           </div>
