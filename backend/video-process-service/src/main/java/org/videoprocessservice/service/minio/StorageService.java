@@ -75,7 +75,7 @@ public class StorageService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to upload bytes to S3", e);
         }
-        return s3Endpoint + "/" + uploadBucket + "/" + key;
+        return  "http://localhost:9000/" + uploadBucket + "/" + key; //s3Endpoint
     }
 
     public String uploadThumbnail(UUID videoId, File file) {
