@@ -1,6 +1,7 @@
 package org.userservice.service.profile.impl;
 
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.userservice.dto.profile.ProfileDtoIn;
@@ -58,6 +59,11 @@ public class ProfileServiceImpl implements ProfileService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
         return getProfileResponse(user);
+    }
+
+    @Override
+    public Page<ProfileDtoOut> findProfiles(String nickname) {
+
     }
 
     private ProfileDtoOut getProfileResponse(User user) {
