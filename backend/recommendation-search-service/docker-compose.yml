@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  recom-db:
+    image: postgres
+    container_name: recom-service-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - recom_db_data:/var/lib/postgresql/data
+    networks:
+      - recom-network
+
+  recom-service:
+    build: .
+    container_name: recom-service-app
+    restart: unless-stopped
+    ports:
+      - "${RECOM_SERVICE_PORT}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://recom-db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+    depends_on:
+      - recom-db
+    networks:
+      - recom-network
+      - shared-network
+
+networks:
+  recom-network:
+    driver: bridge
+  shared-network:
+    driver: bridge
+    external: true
+    name: shared-network
+
+volumes:
+  recom_db_data:
