@@ -38,7 +38,7 @@ const Layout = ({ children }) => {
           paddingLeft: '12px',
           letterSpacing: '0.5px'
         }}>
-          VIDEO SERVICE
+          MYTYBE
         </div>
         
         <nav style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>

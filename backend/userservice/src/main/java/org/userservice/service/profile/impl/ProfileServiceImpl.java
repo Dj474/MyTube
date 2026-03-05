@@ -1,10 +1,13 @@
 package org.userservice.service.profile.impl;
 
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import org.springframework.core.io.InputStreamResource;
+import org.springframework.core.io.Resource;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 import org.userservice.dto.profile.ProfileDtoIn;
 import org.userservice.dto.profile.ProfileDtoOut;
 import org.userservice.entity.profile.Profile;
@@ -12,9 +15,11 @@ import org.userservice.entity.user.User;
 import org.userservice.exception.NotFoundException;
 import org.userservice.repository.user.UserRepository;
 import org.userservice.repository.userProfile.UserProfileRepository;
+import org.userservice.service.minio.StorageService;
 import org.userservice.service.profile.ProfileService;
 import org.userservice.service.user.UserService;
-import org.userservice.specification.PageableParams;
+
+import java.io.InputStream;
 
 @Service
 @RequiredArgsConstructor
@@ -23,12 +28,13 @@ public class ProfileServiceImpl implements ProfileService {
     private final UserService userService;
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
+    private final StorageService storageService;
 
     @Override
     @Transactional
     public ProfileDtoOut updateProfile(ProfileDtoIn request) {
         User currentUser = userService.getCurrent();
-        Profile profile = getOrCreateUserProfile(currentUser);
+        Profile profile = currentUser.getProfile();
 
         // Обновляем поля, если они не null в запросе
         if (request.getFirstName() != null) {
@@ -63,25 +69,30 @@ public class ProfileServiceImpl implements ProfileService {
         return getProfileResponse(user);
     }
 
+    @Override
+    public void uploadPhoto(MultipartFile file) {
+        User user = userService.getCurrent();
+        String key = user.getId() + ".jpg";
+        storageService.uploadPhoto(file, key);
+        Profile profile = user.getProfile();
+        profile.setPhotoUrl("http://localhost:8090/api/v1/profile/photo/" + user.getId());
+        userProfileRepository.save(profile);
+    }
+
+    @Override
+    public ResponseEntity<Resource> getPhoto(Long userId) {
+        User user = userRepository.byId(userId);
+        InputStream is = storageService.getPhoto(userId + ".jpg");
+        Resource res = new InputStreamResource(is);
+        return ResponseEntity.ok().contentType(MediaType.IMAGE_JPEG).body(res);
+    }
+
     private ProfileDtoOut getProfileResponse(User user) {
         Profile profile = user.getProfile();
         if (profile == null) {
             throw new NotFoundException("Profile not found for user: " + user.getId());
         }
         return convertToResponse(profile);
-    }
-
-    private Profile getOrCreateUserProfile(User user) {
-        Profile profile = user.getProfile();
-        if (profile == null) {
-            // Создаем новый профиль, если его нет
-            profile = Profile.builder()
-                    .user(user)
-                    .build();
-            user.setProfile(profile);
-            userRepository.save(user);
-        }
-        return profile;
     }
 
     private ProfileDtoOut convertToResponse(Profile profile) {
@@ -94,6 +105,7 @@ public class ProfileServiceImpl implements ProfileService {
                 .birthDate(profile.getBirthDate())
                 .gender(profile.getGender())
                 .updatedAt(profile.getUpdatedAt())
+                .photoUrl(profile.getPhotoUrl())
                 .build();
     }
 }

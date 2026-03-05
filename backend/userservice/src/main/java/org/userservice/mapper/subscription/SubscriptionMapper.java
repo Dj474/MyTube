@@ -10,6 +10,7 @@ public interface SubscriptionMapper {
 
     @Mapping(target = "authorId", source = "subscription.author.id")
     @Mapping(target = "nickname", source = "subscription.author.username")
+    @Mapping(target = "photoUrl", source = "subscription.author.profile.photoUrl")
     SubscriptionDtoOut toDto(Subscription subscription);
 
 }
