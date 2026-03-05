@@ -31,7 +31,7 @@ public class LikeService {
         if (!likeRepository.existsByUserIdAndComment(userId, comment)) {
             throw new BadRequestException("comment already liked");
         }
-        Like like = new Like(userId, comment);
+        Like like = likeRepository.getByUserIdAndComment(userId, comment);
         likeRepository.delete(like);
     }
 

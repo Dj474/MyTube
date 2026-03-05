@@ -20,7 +20,7 @@ public class LikeService {
     public void createLike(Long userId, UUID commentId) {
         Video video = videoRepository.byId(commentId);
         if (likeRepository.existsByUserIdAndVideo(userId, video)) {
-            throw new BadRequestException("comment already liked");
+            throw new BadRequestException("video already liked");
         }
         Like like = new Like(userId, video);
         likeRepository.save(like);
@@ -29,9 +29,9 @@ public class LikeService {
     public void deleteLike(Long userId, UUID commentId) {
         Video video = videoRepository.byId(commentId);
         if (!likeRepository.existsByUserIdAndVideo(userId, video)) {
-            throw new BadRequestException("comment already liked");
+            throw new BadRequestException("video already liked");
         }
-        Like like = new Like(userId, video);
+        Like like = likeRepository.getByUserIdAndVideo(userId, video);
         likeRepository.delete(like);
     }
 

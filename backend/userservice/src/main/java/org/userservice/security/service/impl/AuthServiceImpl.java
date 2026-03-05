@@ -9,6 +9,7 @@ import org.userservice.dto.security.AuthenticationDtoIn;
 import org.userservice.dto.security.JwtDtoOut;
 import org.userservice.dto.security.JwtRefreshDtoIn;
 import org.userservice.dto.security.JwtRefreshDtoOut;
+import org.userservice.entity.profile.Profile;
 import org.userservice.entity.user.User;
 import org.userservice.exception.BadRequestException;
 import org.userservice.exception.ForbiddenException;
@@ -49,6 +50,11 @@ public class AuthServiceImpl implements AuthService {
         user.setEmail(userDtoIn.getEmail());
         user.setPassword(passwordEncoder.encode(userDtoIn.getPassword()));
         user.setUsername(userDtoIn.getEmail());
+
+        Profile profile = new Profile();
+        profile.setUser(user);
+        user.setProfile(profile);
+        userProfileRepository.save(profile);
         userRepository.save(user);
 
         return getJwtForUser(user);

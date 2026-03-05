@@ -14,4 +14,6 @@ public interface LikeRepository extends JpaRepository<Like, UUID> {
 
     Long countByVideo(Video video);
 
+    Like getByUserIdAndVideo(Long userId, Video video);
+
 }

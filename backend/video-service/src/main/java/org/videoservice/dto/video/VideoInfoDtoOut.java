@@ -2,8 +2,10 @@ package org.videoservice.dto.video;
 
 import lombok.Builder;
 import lombok.Data;
+import org.videoservice.dto.tag.TagDtoOut;
 import org.videoservice.other.enums.VideoStatus;
 
+import java.util.List;
 import java.util.UUID;
 
 @Data
@@ -20,5 +22,7 @@ public class VideoInfoDtoOut {
 
     private Long amountOfLikes = 0L;
     private Boolean isLiked = false;
+
+    private List<TagDtoOut> tags;
 
 }

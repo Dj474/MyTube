@@ -21,4 +21,5 @@ public class ProfileDtoOut {
     private LocalDate birthDate;
     private String gender;
     private LocalDateTime updatedAt;
+    private String photoUrl;
 }

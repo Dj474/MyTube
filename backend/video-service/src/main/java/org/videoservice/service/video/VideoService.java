@@ -12,11 +12,14 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
+import org.videoservice.dto.video.VideoUploadDto;
+import org.videoservice.entity.tag.Tag;
 import org.videoservice.entity.video.Video;
 import org.videoservice.entity.video.Video_;
 import org.videoservice.mapper.video.VideoMapper;
 import org.videoservice.other.enums.VideoStatus;
 import org.videoservice.other.record.kafka.VideoUploadEvent;
+import org.videoservice.repository.tag.TagRepository;
 import org.videoservice.repository.video.VideoRepository;
 import org.videoservice.service.kafka.KafkaProducerService;
 import org.videoservice.service.minio.StorageService;
@@ -24,6 +27,9 @@ import org.videoservice.specification.PageableParams;
 import org.videoservice.specification.video.VideoSpecification;
 
 import java.io.InputStream;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -34,21 +40,30 @@ public class VideoService {
     private final StorageService storageService;
     private final KafkaProducerService kafkaProducerService;
     private final VideoMapper videoMapper;
+    private final TagRepository tagRepository;
 
     @Transactional
-    public VideoInfoDtoOut upload(MultipartFile file, String title, String description, Long userId) {
+    public VideoInfoDtoOut upload(MultipartFile file, VideoUploadDto dto, Long userId) {
         UUID videoId = UUID.randomUUID();
 
         // 1. Формируем путь (ключ) для S3
         String s3Key = String.format("%s-%s", videoId, file.getOriginalFilename());
 
+        // Поиск существующих тегов
+        Set<Tag> tags = new HashSet<>();
+        if (dto.getTagIds() != null && !dto.getTagIds().isEmpty()) {
+            List<Tag> foundTags = tagRepository.findAllById(dto.getTagIds());
+            tags.addAll(foundTags);
+        }
+
         // 2. Сохраняем метаданные в БД
         Video video = Video.builder()
                 .id(videoId)
-                .title(title)
-                .description(description)
+                .title(dto.getTitle())
+                .description(dto.getDescription())
                 .userId(userId)
                 .s3Key(s3Key)
+                .tags(tags)
                 .status(VideoStatus.UPLOADING)
                 .build();
 
@@ -60,7 +75,7 @@ public class VideoService {
         video.setStatus(VideoStatus.PROCESSING);
 
         // 4. Отправить сообщение в Kafka для обработки
-        VideoUploadEvent videoUploadEvent = new VideoUploadEvent(videoId, s3Key, title);
+        VideoUploadEvent videoUploadEvent = new VideoUploadEvent(videoId, s3Key, dto.getTitle());
         kafkaProducerService.sendUploadEvent(videoUploadEvent);
 
         videoRepository.save(video);

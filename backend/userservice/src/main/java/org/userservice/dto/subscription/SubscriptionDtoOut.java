@@ -9,5 +9,6 @@ public class SubscriptionDtoOut {
 
     private Long authorId;
     private String nickname;
+    private String photoUrl;
 
 }

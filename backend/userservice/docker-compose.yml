@@ -34,8 +34,28 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
       JWT_ACCESS_EXPIRATION: ${JWT_ACCESS_EXPIRATION}
       JWT_REFRESH_EXPIRATION: ${JWT_REFRESH_EXPIRATION}
+
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
     depends_on:
       - user-db
+    networks:
+      - user-network
+      - shared-network
+
+  user-minio:
+    image: minio/minio
+    container_name: minio-user-storage
+    restart: unless-stopped
+    ports:
+      - "9090:9000"       # API Port
+      - "9091:9001"       # Console UI Port
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - minio_data:/data
+    command: server /data --console-address ":9001"
     networks:
       - user-network
       - shared-network
@@ -50,3 +70,4 @@ networks:
 
 volumes:
   user_db_data:
+  minio_data:
