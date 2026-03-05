@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 import org.videoservice.dto.video.VideoInfoDtoOut;
+import org.videoservice.dto.video.VideoUploadDto;
 import org.videoservice.service.video.VideoService;
 import org.videoservice.specification.PageableParams;
 
@@ -22,16 +23,10 @@ public class VideoController {
     @PostMapping("/upload")
     public VideoInfoDtoOut uploadVideo(
             @RequestParam("file") MultipartFile file,
-            @RequestParam("title") String title,
-            @RequestParam(value = "description", required = false) String description,
-            @RequestHeader("X-User-Id") Long userId // Получаем ID из Gateway
+            @RequestPart("info") VideoUploadDto info,
+            @RequestHeader("X-User-Id") Long userId
     ) {
-        // Логика:
-        // 1. Создать запись в БД (UPLOADING)
-        // 2. Отправить файл в S3
-        // 3. Отправить событие в Kafka (для обработки в HLS)
-
-        return videoService.upload(file, title, description, userId);
+        return videoService.upload(file, info, userId);
     }
 
     @GetMapping("/{id}")

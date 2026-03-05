@@ -5,9 +5,10 @@ import org.mapstruct.Mapping;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.videoservice.dto.video.VideoInfoDtoOut;
 import org.videoservice.entity.video.Video;
+import org.videoservice.mapper.tag.TagMapper;
 import org.videoservice.repository.like.LikeRepository;
 
-@Mapper(componentModel = "spring")
+@Mapper(componentModel = "spring", uses = {TagMapper.class})
 public abstract class VideoMapper {
 
     @Autowired
