@@ -18,6 +18,7 @@ import org.videoservice.entity.video.Video;
 import org.videoservice.entity.video.Video_;
 import org.videoservice.mapper.video.VideoMapper;
 import org.videoservice.other.enums.VideoStatus;
+import org.videoservice.other.record.kafka.VideoForSearchRecord;
 import org.videoservice.other.record.kafka.VideoUploadEvent;
 import org.videoservice.repository.tag.TagRepository;
 import org.videoservice.repository.video.VideoRepository;
@@ -77,6 +78,13 @@ public class VideoService {
         // 4. Отправить сообщение в Kafka для обработки
         VideoUploadEvent videoUploadEvent = new VideoUploadEvent(videoId, s3Key, dto.getTitle());
         kafkaProducerService.sendUploadEvent(videoUploadEvent);
+
+        StringBuilder stringTags = new StringBuilder();
+        for (Tag tag : tags) {
+            stringTags.append(tag.getDisplayName());
+        }
+        VideoForSearchRecord videoForSearchRecord = new VideoForSearchRecord(videoId, dto.getTitle(), dto.getDescription(), stringTags.toString());
+        kafkaProducerService.sendSearchEvent(videoForSearchRecord);
 
         videoRepository.save(video);
 
