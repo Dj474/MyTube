@@ -1,6 +1,6 @@
 package org.recommendationsearchservice.entity.elastic;
 
-import jakarta.persistence.Id;
+import org.springframework.data.annotation.Id;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.recommendationsearchservice.other.record.user.UserRecord;
@@ -33,19 +33,21 @@ public class SearchIndexDoc {
     private String tags;
 
     @Field(type = FieldType.Date, format = DateFormat.date_optional_time)
-    private Instant createdAt;
+    private Instant createdAt = Instant.now();
 
     public SearchIndexDoc(VideoRecord record){
         id = record.id().toString();
         title = record.title();
         content = record.description();
         tags = record.tags();
+        entityType = "VIDEO";
     };
 
     public SearchIndexDoc(UserRecord record) {
         id = record.id().toString();
         title = record.name();
         content = record.description();
+        entityType = "USER";
     }
 
 
