@@ -15,10 +15,12 @@ import org.userservice.exception.BadRequestException;
 import org.userservice.exception.ForbiddenException;
 import org.userservice.exception.NotFoundException;
 import org.userservice.exception.UnauthorizedException;
+import org.userservice.other.record.kafka.UserForSearchRecord;
 import org.userservice.repository.user.UserRepository;
 import org.userservice.repository.userProfile.UserProfileRepository;
 import org.userservice.security.jwt.JwtTokenProvider;
 import org.userservice.security.service.AuthService;
+import org.userservice.service.kafka.KafkaProducerService;
 
 import java.util.Objects;
 
@@ -30,6 +32,7 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final UserProfileRepository userProfileRepository;
+    private final KafkaProducerService kafkaService;
 
     private JwtDtoOut getJwtForUser(User user) {
         JwtDtoOut jwtDtoOut = new JwtDtoOut();
@@ -54,8 +57,9 @@ public class AuthServiceImpl implements AuthService {
         Profile profile = new Profile();
         profile.setUser(user);
         user.setProfile(profile);
-        userProfileRepository.save(profile);
         userRepository.save(user);
+
+        kafkaService.sendSearchEvent(new UserForSearchRecord(user.getId(), user.getUsername(), user.getProfile().getBio()));
 
         return getJwtForUser(user);
     }

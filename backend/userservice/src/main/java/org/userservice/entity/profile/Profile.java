@@ -20,7 +20,6 @@ import java.time.LocalDateTime;
 public class Profile {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "user_id")
     private Long id;
 
@@ -51,5 +50,6 @@ public class Profile {
 
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
+    @MapsId
     private User user;
 }

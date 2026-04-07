@@ -4,11 +4,13 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.videoservice.entity.history.History;
 import org.videoservice.entity.tag.Tag;
 import org.videoservice.other.enums.VideoStatus;
 
 import java.time.OffsetDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -58,4 +60,7 @@ public class Video {
             inverseJoinColumns = @JoinColumn(name = "tag_id")
     )
     private Set<Tag> tags = new HashSet<>();
+
+    @OneToMany(mappedBy = "video")
+    private List<History> histories;
 }

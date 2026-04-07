@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  recom-db:
+    image: postgres
+    container_name: recom-service-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    ports:
+      - "${DB_PORT}:5432"
+    volumes:
+      - recom_db_data:/var/lib/postgresql/data
+    networks:
+      - recom-network
+
+  # --- ЭЛАСТИК ---
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.12.0
+    container_name: elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - xpack.security.enabled=true
+      - ELASTIC_PASSWORD=${ELASTIC_PASSWORD}
+      - xpack.security.http.ssl.enabled=false
+      - "ES_JAVA_OPTS=-Xms512m -Xmx512m"
+    ports:
+      - "9200:9200"
+    volumes:
+      - elastic_data:/usr/share/elasticsearch/data
+    networks:
+      - recom-network
+
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.12.0
+    container_name: kibana
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+      - ELASTICSEARCH_USERNAME=${KIBANA_SYSTEM_USERNAME}
+      - ELASTICSEARCH_PASSWORD=${KIBANA_SYSTEM_PASSWORD}
+      # нужно выполнить docker exec -it elasticsearch bin/elasticsearch-reset-password -u kibana_system --auto --batch
+      # скопировать полученный пароль в .env
+      # и перезапустить kibana
+    depends_on:
+      - elasticsearch
+    networks:
+      - recom-network
+
+  recom-service:
+    build: .
+    container_name: recom-service-app
+    restart: unless-stopped
+    ports:
+      - "${RECOM_SERVICE_PORT}:8080"
+    environment:
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://recom-db:5432/${DB_NAME}
+      SPRING_DATASOURCE_USERNAME: ${DB_USER}
+      SPRING_DATASOURCE_PASSWORD: ${DB_PASSWORD}
+
+      SPRING_ELASTICSEARCH_URIS: http://elasticsearch:9200
+      ELASTIC_PASSWORD: ${ELASTIC_PASSWORD}
+    depends_on:
+      - recom-db
+      - elasticsearch
+    networks:
+      - recom-network
+      - shared-network
+
+networks:
+  recom-network:
+    driver: bridge
+  shared-network:
+    driver: bridge
+    external: true
+    name: shared-network
+
+volumes:
+  recom_db_data:
+  elastic_data:
