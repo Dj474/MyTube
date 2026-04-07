@@ -2,6 +2,7 @@ package org.recommendationsearchservice.service.kafka;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.recommendationsearchservice.other.record.history.HistoryRecord;
 import org.recommendationsearchservice.other.record.user.UserRecord;
 import org.recommendationsearchservice.other.record.video.VideoRecord;
 import org.recommendationsearchservice.service.elastic.IndexingService;
@@ -25,6 +26,12 @@ public class KafkaService {
     public void processUser(UserRecord record) {
         log.info("message in user-recomend");
         indexingService.createUserEntity(record);
+    }
+
+    @KafkaListener(containerFactory = "kafkaListenerContainerHistoryFactory", topics = "video-history-topic", groupId = "recom-group")
+    public void processHistory(HistoryRecord record) {
+        log.info("message in video-history");
+        indexingService.createHistoryEntity(record);
     }
 
 }
