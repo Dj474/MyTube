@@ -9,6 +9,7 @@ import org.videoservice.dto.history.HistoryDtoIn;
 import org.videoservice.dto.history.HistoryDtoOut;
 import org.videoservice.entity.history.History;
 import org.videoservice.entity.history.History_;
+import org.videoservice.entity.tag.Tag;
 import org.videoservice.entity.video.Video;
 import org.videoservice.mapper.history.HistoryMapper;
 import org.videoservice.other.record.kafka.VideoHistoryEvent;
@@ -30,7 +31,12 @@ public class HistoryService {
         Video video = videoRepository.byId(dto.getVideoId());
         History history = historyRepository.save(new History(userId, video));
 
-        kafkaService.sendHistoryEvent(new VideoHistoryEvent(history.getId(), history.getUserId(), history.getVideo().getId()));
+        StringBuilder stringTags = new StringBuilder();
+        for (Tag tag : video.getTags()){
+            stringTags.append(tag.getDisplayName()).append(" ");
+        }
+
+        kafkaService.sendHistoryEvent(new VideoHistoryEvent(history.getId(), history.getUserId(), history.getVideo().getId(), stringTags.toString()));
     }
 
     public Page<HistoryDtoOut> getHistory(PageableParams params, Long userId){

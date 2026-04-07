@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Hls from 'hls.js';
 import api from './api';
-import { User, MessageSquare, ThumbsUp, Clock, Tag as TagIcon, ChevronLeft } from 'lucide-react';
+import { User, MessageSquare, ThumbsUp, Clock, Tag as TagIcon, ChevronLeft, Play } from 'lucide-react';
 
 const VideoPlayerPage = () => {
   const { id } = useParams();
@@ -12,10 +12,22 @@ const VideoPlayerPage = () => {
   
   const [videoData, setVideoData] = useState(null);
   const [comments, setComments] = useState([]);
+  const [recommendations, setRecommendations] = useState([]); // Состояние для рекомендаций
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
+  // 1. Функция записи в историю (отправка события на бэкенд)
+  const recordVideoView = async () => {
+    try {
+      // Отправляем ID видео. UserId бэкенд вытащит из заголовков/токена
+      await api.post('/video/history', { videoId: id });
+    } catch (err) {
+      console.error("Ошибка при сохранении истории просмотра:", err);
+    }
+  };
+
+  // 2. Загрузка данных видео и комментариев
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -24,8 +36,13 @@ const VideoPlayerPage = () => {
           api.get(`/videos/${id}`),
           api.get(`/comments/${id}`, { params: { size: 50, sort: 'createdAt,desc' } }).catch(() => ({ data: { content: [] } }))
         ]);
+        
         setVideoData(videoRes.data);
         setComments(commentsRes.data.content || []);
+        
+        // Сразу после загрузки данных видео — записываем просмотр
+        recordVideoView();
+
       } catch (err) {
         setError("Не удалось загрузить видео.");
       } finally {
@@ -35,10 +52,27 @@ const VideoPlayerPage = () => {
     loadData();
   }, [id]);
 
+  // 3. Загрузка рекомендаций (вызывается после того, как получили данные текущего видео)
+  useEffect(() => {
+    const fetchRecommendations = async () => {
+      try {
+        // Эндпоинт твоего recommendation-service
+        const res = await api.get('/video/recommendations', { params: { size: 6 } });
+        setRecommendations(res.data.content || []);
+      } catch (err) {
+        console.warn("Рекомендации не удалось загрузить");
+      }
+    };
+
+    if (videoData) {
+      fetchRecommendations();
+    }
+  }, [id, videoData]);
+
+  // Настройка HLS плеера
   useEffect(() => {
     if (!videoData || !videoRef.current) return;
     
-    // ВАЖНО: Убедись, что бэкенд отдает полную ссылку на HLS (playlist.m3u8)
     const hlsUrl = videoData.s3Key; 
     if (!hlsUrl) return;
 
@@ -126,24 +160,22 @@ const VideoPlayerPage = () => {
 
   return (
     <div style={{ backgroundColor: '#0f172a', minHeight: '100vh', color: '#f1f5f9', padding: '24px' }}>
-      <div style={{ maxWidth: '1280px', margin: '0 auto', display: 'flex', gap: '30px', flexDirection: 'row', flexWrap: 'wrap' }}>
+      <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', gap: '30px', flexDirection: 'row', flexWrap: 'wrap' }}>
         
         {/* ЛЕВАЯ КОЛОНКА: ПЛЕЕР И ИНФО */}
-        <div style={{ flex: '1 1 800px' }}>
+        <div style={{ flex: '1 1 850px' }}>
           
           <button onClick={() => navigate(-1)} style={backButtonStyle}>
             <ChevronLeft size={20} /> Назад
           </button>
 
-          {/* Плеер */}
           <div style={playerContainerStyle}>
             <video ref={videoRef} controls playsInline style={{ width: '100%', height: '100%' }} />
           </div>
 
-          {/* Информация о видео */}
           <div style={{ marginTop: '24px' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0, lineHeight: '1.2' }}>
+              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>
                 {videoData?.title}
               </h1>
               
@@ -153,22 +185,16 @@ const VideoPlayerPage = () => {
               </button>
             </div>
 
-            {/* БЛОК ТЕГОВ */}
             {videoData?.tags && videoData.tags.length > 0 && (
               <div style={tagContainerStyle}>
                 {videoData.tags.map(tag => (
-                  <span 
-                    key={tag.id} 
-                    style={tagChipStyle}
-                    onClick={() => navigate(`/search?tagId=${tag.id}`)}
-                  >
+                  <span key={tag.id} style={tagChipStyle} onClick={() => navigate(`/search?tagId=${tag.id}`)}>
                     #{tag.displayName}
                   </span>
                 ))}
               </div>
             )}
 
-            {/* Описание */}
             <div style={descriptionBoxStyle}>
               <div style={metaRowStyle}>
                 <Clock size={14} /> 
@@ -228,13 +254,35 @@ const VideoPlayerPage = () => {
           </div>
         </div>
 
-        {/* ПРАВАЯ КОЛОНКА: РЕКОМЕНДАЦИИ */}
+        {/* ПРАВАЯ КОЛОНКА: ДИНАМИЧЕСКИЕ РЕКОМЕНДАЦИИ */}
         <div style={{ flex: '1 1 350px' }}>
           <h4 style={{ color: '#94a3b8', marginBottom: '20px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-             Следующие видео
+             Рекомендуем посмотреть
           </h4>
-          <div style={sidebarPlaceholderStyle}>
-            <p>Похожие видео по вашим тегам появятся здесь в ближайшее время</p>
+          
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {recommendations.length > 0 ? (
+              recommendations.map((rec) => (
+                <div 
+                  key={rec.id} 
+                  onClick={() => navigate(`/video/${rec.id}`)}
+                  style={recCardStyle}
+                >
+                  <div style={recThumbnailStyle}>
+                    <Play size={20} color="white" opacity={0.5} />
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={recTitleStyle}>{rec.title}</div>
+                    <div style={recMetaStyle}>@{rec.authorNickname || 'Автор'}</div>
+                    <div style={recMetaStyle}>{rec.entityType === 'VIDEO' ? 'Видео' : 'Курс'}</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={sidebarPlaceholderStyle}>
+                <p>Здесь появятся видео, подобранные специально для вас</p>
+              </div>
+            )}
           </div>
         </div>
 
@@ -243,64 +291,29 @@ const VideoPlayerPage = () => {
   );
 };
 
-// --- СТИЛИ В ОБЪЕКТАХ ---
+// --- СТИЛИ ---
 
 const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0f172a', color: 'white' };
-
-const backButtonStyle = { 
-  background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', 
-  display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '16px', fontSize: '0.9rem' 
-};
-
-const playerContainerStyle = { 
-  width: '100%', background: '#000', borderRadius: '16px', overflow: 'hidden', 
-  aspectRatio: '16/9', border: '1px solid #334155', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' 
-};
-
-const likeButtonStyle = { 
-  display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px',
-  borderRadius: '24px', border: 'none', cursor: 'pointer', transition: '0.2s ease'
-};
-
+const backButtonStyle = { background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '16px', fontSize: '0.9rem' };
+const playerContainerStyle = { width: '100%', background: '#000', borderRadius: '16px', overflow: 'hidden', aspectRatio: '16/9', border: '1px solid #334155', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' };
+const likeButtonStyle = { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', borderRadius: '24px', border: 'none', cursor: 'pointer', transition: '0.2s ease' };
 const tagContainerStyle = { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '16px' };
-
-const tagChipStyle = {
-  backgroundColor: '#1e293b', color: '#3b82f6', padding: '6px 14px',
-  borderRadius: '18px', fontSize: '0.85rem', fontWeight: '600',
-  border: '1px solid #334155', cursor: 'pointer', transition: '0.2s',
-  display: 'inline-flex', alignItems: 'center'
-};
-
-const descriptionBoxStyle = { 
-  backgroundColor: '#1e293b', padding: '20px', borderRadius: '12px', 
-  marginTop: '20px', color: '#cbd5e1', border: '1px solid #334155' 
-};
-
-const metaRowStyle = { 
-  display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', 
-  color: '#94a3b8', marginBottom: '12px', borderBottom: '1px solid #334155', paddingBottom: '10px' 
-};
-
+const tagChipStyle = { backgroundColor: '#1e293b', color: '#3b82f6', padding: '6px 14px', borderRadius: '18px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #334155', cursor: 'pointer', transition: '0.2s' };
+const descriptionBoxStyle = { backgroundColor: '#1e293b', padding: '20px', borderRadius: '12px', marginTop: '20px', color: '#cbd5e1', border: '1px solid #334155' };
+const metaRowStyle = { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '12px', borderBottom: '1px solid #334155', paddingBottom: '10px' };
 const avatarStyle = { width: '44px', height: '44px', borderRadius: '50%', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
 const avatarSmallStyle = { width: '38px', height: '38px', borderRadius: '50%', background: '#1e293b', border: '1px solid #475569', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
-
-const textareaStyle = { 
-  width: '100%', background: 'transparent', border: 'none', borderBottom: '2px solid #334155', 
-  color: 'white', outline: 'none', padding: '8px 0', resize: 'none', fontSize: '1rem', transition: '0.3s focus'
-};
-
-const submitButtonStyle = { 
-  background: '#3b82f6', color: 'white', border: 'none', padding: '10px 24px', 
-  borderRadius: '24px', cursor: 'pointer', fontWeight: '700', transition: '0.2s' 
-};
-
+const textareaStyle = { width: '100%', background: 'transparent', border: 'none', borderBottom: '2px solid #334155', color: 'white', outline: 'none', padding: '8px 0', resize: 'none', fontSize: '1rem' };
+const submitButtonStyle = { background: '#3b82f6', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', fontWeight: '700' };
 const commentMetaStyle = { display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '6px' };
 const commentTextStyle = { margin: '0 0 8px 0', fontSize: '1rem', color: '#cbd5e1', lineHeight: '1.4' };
 const commentLikeButtonStyle = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 0' };
+const sidebarPlaceholderStyle = { padding: '40px 20px', border: '2px dashed #334155', borderRadius: '16px', textAlign: 'center', color: '#475569', fontSize: '0.9rem' };
 
-const sidebarPlaceholderStyle = { 
-  padding: '40px 20px', border: '2px dashed #334155', borderRadius: '16px', 
-  textAlign: 'center', color: '#475569', fontSize: '0.9rem' 
-};
+// Стили карточек рекомендаций
+const recCardStyle = { display: 'flex', gap: '12px', cursor: 'pointer', padding: '8px', borderRadius: '12px', transition: 'background 0.2s', backgroundColor: 'transparent' };
+const recThumbnailStyle = { width: '140px', height: '80px', backgroundColor: '#1e293b', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #334155' };
+const recTitleStyle = { fontSize: '0.95rem', fontWeight: '600', color: '#f1f5f9', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.3' };
+const recMetaStyle = { fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' };
 
 export default VideoPlayerPage;

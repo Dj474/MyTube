@@ -81,7 +81,7 @@ public class VideoService {
 
         StringBuilder stringTags = new StringBuilder();
         for (Tag tag : tags) {
-            stringTags.append(tag.getDisplayName());
+            stringTags.append(tag.getDisplayName()).append(" ");
         }
         VideoForSearchRecord videoForSearchRecord = new VideoForSearchRecord(videoId, dto.getTitle(), dto.getDescription(), stringTags.toString());
         kafkaProducerService.sendSearchEvent(videoForSearchRecord);

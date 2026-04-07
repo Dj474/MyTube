@@ -9,7 +9,7 @@ import org.videoservice.service.history.HistoryService;
 import org.videoservice.specification.PageableParams;
 
 @RestController
-@RequestMapping("api/v1/video/history")
+@RequestMapping("api/v1/videos/history")
 @RequiredArgsConstructor
 public class HistoryController {
 
