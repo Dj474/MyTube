@@ -29,6 +29,9 @@ public class HistoryService {
 
     public void addToHistory(HistoryDtoIn dto, Long userId) {
         Video video = videoRepository.byId(dto.getVideoId());
+
+        historyRepository.findByUserIdAndVideoId(userId, dto.getVideoId()).ifPresent(historyRepository::delete);
+
         History history = historyRepository.save(new History(userId, video));
 
         StringBuilder stringTags = new StringBuilder();
