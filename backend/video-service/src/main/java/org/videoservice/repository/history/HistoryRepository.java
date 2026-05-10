@@ -18,4 +18,6 @@ public interface HistoryRepository extends JpaRepository<History, UUID>, JpaSpec
 
     Optional<History> findByUserIdAndVideoId(Long userId, UUID videoId);
 
+    void deleteAllByUserIdAndVideoId(Long userId, UUID videoId);
+
 }

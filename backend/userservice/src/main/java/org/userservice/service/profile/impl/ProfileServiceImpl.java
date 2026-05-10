@@ -13,8 +13,10 @@ import org.userservice.dto.profile.ProfileDtoOut;
 import org.userservice.entity.profile.Profile;
 import org.userservice.entity.user.User;
 import org.userservice.exception.NotFoundException;
+import org.userservice.other.record.kafka.UserForSearchRecord;
 import org.userservice.repository.user.UserRepository;
 import org.userservice.repository.userProfile.UserProfileRepository;
+import org.userservice.service.kafka.KafkaProducerService;
 import org.userservice.service.minio.StorageService;
 import org.userservice.service.profile.ProfileService;
 import org.userservice.service.user.UserService;
@@ -29,6 +31,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
     private final StorageService storageService;
+    private final KafkaProducerService kafkaService;
 
     @Override
     @Transactional
@@ -57,6 +60,8 @@ public class ProfileServiceImpl implements ProfileService {
         }
 
         Profile savedProfile = userProfileRepository.save(profile);
+
+        kafkaService.sendSearchEvent(new UserForSearchRecord(currentUser.getId(), currentUser.getUsername(), savedProfile.getBio()));
 
         return convertToResponse(savedProfile);
     }
