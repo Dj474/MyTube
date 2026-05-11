@@ -4,10 +4,10 @@ import Hls from 'hls.js';
 import api from './api';
 import { 
   ThumbsUp, Clock, ChevronLeft, PlusCircle, X, 
-  ListMusic, User, Heart, PlayCircle 
+  ListMusic, User, Heart, PlayCircle, Flag, AlertTriangle, Send 
 } from 'lucide-react';
 
-// --- КОМПОНЕНТ АВТОРА (ВАША РАБОЧАЯ ЛОГИКА) ---
+// --- КОМПОНЕНТ АВТОРА ---
 const AuthorProfile = ({ userId, size = "40px", showNickname = true }) => {
   const [profile, setProfile] = useState(null);
   const [avatarUrl, setAvatarUrl] = useState(null);
@@ -15,16 +15,12 @@ const AuthorProfile = ({ userId, size = "40px", showNickname = true }) => {
 
   useEffect(() => {
     let isMounted = true;
-    
     const fetchAuthorData = async () => {
       if (!userId || userId === "undefined") return;
       try {
-        // 1. Запрос данных профиля
         const res = await api.get(`/profile/${userId}`);
         if (!isMounted) return;
         setProfile(res.data);
-
-        // 2. Загрузка фото через Blob (для обхода защиты S3/Auth)
         const photoPath = res.data.photoUrl || res.data.avatarUrl;
         if (photoPath) {
           const imgRes = await api.get(photoPath, { responseType: 'blob' });
@@ -37,9 +33,7 @@ const AuthorProfile = ({ userId, size = "40px", showNickname = true }) => {
         console.warn("Не удалось загрузить данные автора:", userId);
       }
     };
-
     fetchAuthorData();
-
     return () => {
       isMounted = false;
       if (avatarUrl) URL.revokeObjectURL(avatarUrl);
@@ -71,7 +65,7 @@ const AuthorProfile = ({ userId, size = "40px", showNickname = true }) => {
   );
 };
 
-// --- ВСПОМОГАТЕЛЬНЫЙ КОМПОНЕНТ ДЛЯ ОБЫЧНЫХ ИЗОБРАЖЕНИЙ (ПРЕВЬЮ) ---
+// --- ВСПОМОГАТЕЛЬНЫЙ КОМПОНЕНТ ДЛЯ ИЗОБРАЖЕНИЙ ---
 const SecureImage = ({ path, style, alt = "" }) => {
   const [url, setUrl] = useState(null);
   useEffect(() => {
@@ -102,6 +96,10 @@ const VideoPlayerPage = () => {
   const [loading, setLoading] = useState(true);
   const [playlists, setPlaylists] = useState([]);
   const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
+
+  // Состояния для модалки жалоб
+  const [reportModal, setReportModal] = useState({ isOpen: false, type: null, targetId: null });
+  const [reportForm, setReportForm] = useState({ reason: 'SPAM', description: '' });
 
   const formatDate = (d) => {
     if (!d) return "";
@@ -166,6 +164,22 @@ const VideoPlayerPage = () => {
     } catch { alert("Ошибка отправки"); }
   };
 
+  // --- ЛОГИКА ОТПРАВКИ ЖАЛОБЫ ---
+  const submitReport = async () => {
+    try {
+      const endpoint = reportModal.type === 'video' 
+        ? `/videos/report/${id}` 
+        : `/comments/report/${reportModal.targetId}`;
+      
+      await api.post(endpoint, reportForm);
+      alert("Жалоба успешно отправлена");
+      setReportModal({ isOpen: false, type: null, targetId: null });
+      setReportForm({ reason: 'SPAM', description: '' });
+    } catch (err) {
+      alert(err.response?.data?.message || "Ошибка при отправке жалобы");
+    }
+  };
+
   if (loading) return <div style={centerStyle}>Загрузка...</div>;
 
   return (
@@ -189,6 +203,13 @@ const VideoPlayerPage = () => {
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
               <AuthorProfile userId={videoData?.userId} size="50px" />
               <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  onClick={() => setReportModal({ isOpen: true, type: 'video', targetId: id })} 
+                  style={{ ...actionBtn, color: '#f87171' }} 
+                  title="Пожаловаться на видео"
+                >
+                  <Flag size={18}/>
+                </button>
                 <button onClick={() => {
                   api.get('/videos/playlist/my').then(r => setPlaylists(r.data.content));
                   setIsPlaylistModalOpen(true);
@@ -224,12 +245,17 @@ const VideoPlayerPage = () => {
                 {comments.map(c => (
                   <div key={c.id} style={{ borderBottom: '1px solid #1e293b', paddingBottom: '20px' }}>
                     <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
-                      {/* Используем ваш рабочий компонент для каждого комментария */}
                       <AuthorProfile userId={c.userId} size="40px" />
                       <div style={{ flex: 1, paddingTop: '4px' }}>
                         <div style={{ color: '#e2e8f0', fontSize: '0.95rem', lineHeight: '1.5' }}>
                           {c.content}
                         </div>
+                        <button 
+                          onClick={() => setReportModal({ isOpen: true, type: 'comment', targetId: c.id })} 
+                          style={commentReportBtn}
+                        >
+                          <AlertTriangle size={14} /> <span style={{ fontSize: '0.8rem' }}>Пожаловаться</span>
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -238,7 +264,7 @@ const VideoPlayerPage = () => {
             </div>
           </div>
 
-          {/* ПРАВАЯ ЧАСТЬ (РЕКОМЕНДАЦИИ) */}
+          {/* ПРАВАЯ ЧАСТЬ */}
           <div>
             <h3 style={{ marginBottom: '20px', fontSize: '1.1rem' }}>Похожие видео</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -277,11 +303,53 @@ const VideoPlayerPage = () => {
           </div>
         </div>
       )}
+
+      {/* --- МОДАЛКА ЖАЛОБЫ (НОВАЯ) --- */}
+      {reportModal.isOpen && (
+        <div style={modalOverlay} onClick={() => setReportModal({ isOpen: false, type: null, targetId: null })}>
+          <div style={modalContent} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>Пожаловаться на {reportModal.type === 'video' ? 'видео' : 'комментарий'}</h3>
+              <X cursor="pointer" onClick={() => setReportModal({ isOpen: false, type: null, targetId: null })} />
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={labelStyle}>Причина</label>
+              <select 
+                style={selectStyle}
+                value={reportForm.reason}
+                onChange={e => setReportForm({...reportForm, reason: e.target.value})}
+              >
+                <option value="SPAM">Спам</option>
+                <option value="HARASSMENT">Оскорбление</option>
+                <option value="VIOLENCE">Насилие</option>
+                <option value="COPYRIGHT">Авторские права</option>
+                <option value="OTHER">Другое</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Описание (необязательно)</label>
+              <textarea 
+                style={{ ...textareaStyle, width: '100%', minHeight: '80px' }}
+                placeholder="Расскажите подробнее..."
+                value={reportForm.description}
+                onChange={e => setReportForm({...reportForm, description: e.target.value})}
+              />
+            </div>
+
+            <button onClick={submitReport} style={reportSubmitBtn}>
+              <Send size={16} /> Отправить жалобу
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
-// --- СТИЛИ (ГАРМОНИЧНЫЕ С ВАШИМ ДИЗАЙНОМ) ---
+// --- СТИЛИ ---
 const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white', background: '#0f172a' };
 const backButtonStyle = { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', marginBottom: '20px' };
 const playerWrapper = { width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
@@ -291,13 +359,18 @@ const metaDate = { display: 'flex', alignItems: 'center', gap: '8px', color: '#9
 const textareaStyle = { flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', color: 'white', padding: '14px', resize: 'none', minHeight: '60px', outline: 'none' };
 const submitBtn = { background: '#3b82f6', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' };
 
+const commentReportBtn = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginTop: '8px', padding: 0, display: 'flex', alignItems: 'center', gap: '4px', transition: '0.2s' };
+const labelStyle = { display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' };
+const selectStyle = { width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '10px', color: 'white', outline: 'none' };
+const reportSubmitBtn = { width: '100%', background: '#ef4444', border: 'none', color: 'white', padding: '12px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
+
 const recCard = { display: 'flex', gap: '12px', cursor: 'pointer', background: '#1e293b', padding: '8px', borderRadius: '12px' };
 const recImg = { width: '140px', height: '80px', borderRadius: '8px', flexShrink: 0 };
 const recTitle = { fontSize: '0.9rem', fontWeight: 'bold', color: '#f1f5f9', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 const recDesc = { fontSize: '0.8rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
 
-const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modalContent = { background: '#1e293b', padding: '25px', borderRadius: '20px', width: '350px' };
+const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modalContent = { background: '#1e293b', padding: '25px', borderRadius: '24px', width: '400px', border: '1px solid #334155', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' };
 const playlistRow = { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', cursor: 'pointer', borderRadius: '10px', background: '#0f172a', marginBottom: '8px' };
 
 export default VideoPlayerPage;
