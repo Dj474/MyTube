@@ -14,6 +14,7 @@ import org.springframework.data.elasticsearch.core.SearchHits;
 import org.springframework.data.elasticsearch.core.query.Query;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -71,48 +72,68 @@ public class RecommendationService {
     }
 
     public Page<RecommendationDtoOut> getRecommendations(Long userId, PageableParams params) {
-        // 1. Преобразуем параметры в объект пагинации Spring
         Pageable pageable = params.toPageable();
+        int targetSize = pageable.getPageSize();
 
-        // 2. Получаем теги из истории (используем уже готовый приватный метод)
         List<String> lastTags = getUserLastTags(userId);
+        List<RecommendationDtoOut> combinedContent = new ArrayList<>();
+        long totalHits = 0;
 
-        // Если истории нет — возвращаем пустую страницу
-        if (lastTags.isEmpty()) {
-            return Page.empty(pageable);
+        // 1. Пытаемся найти релевантные видео по тегам
+        if (!lastTags.isEmpty()) {
+            String searchKeywords = String.join(" ", lastTags);
+            Query relevantQuery = NativeQuery.builder()
+                    .withQuery(q -> q.bool(b -> b
+                            .must(m -> m.multiMatch(mm -> mm
+                                    .query(searchKeywords)
+                                    .fields("tags^3", "title^2", "content")
+                            ))
+                            .filter(f -> f.term(t -> t.field("entityType").value("VIDEO")))
+                    ))
+                    .withPageable(pageable)
+                    .build();
+
+            SearchHits<SearchIndexDoc> relevantHits = elasticsearchOperations.search(relevantQuery, SearchIndexDoc.class);
+            totalHits = relevantHits.getTotalHits();
+
+            relevantHits.getSearchHits().forEach(hit ->
+                    combinedContent.add(new RecommendationDtoOut(UUID.fromString(hit.getContent().getId())))
+            );
         }
 
-        String searchKeywords = String.join(" ", lastTags);
+        // 2. Если результатов меньше, чем запрошенный size, "добиваем" случайными
+        if (combinedContent.size() < targetSize) {
+            int needMore = targetSize - combinedContent.size();
 
-        // 3. Строим запрос к Elasticsearch
-        // Добавляем .withPageable(pageable), чтобы Elastic вернул нужный кусок данных (from/size)
-        Query query = NativeQuery.builder()
-                .withQuery(q -> q.bool(b -> b
-                        .must(m -> m.multiMatch(mm -> mm
-                                .query(searchKeywords)
-                                .fields("tags^3", "title^2", "content")
-                        ))
-                        .filter(f -> f.term(t -> t.field("entityType").value("VIDEO")))
-                ))
-                .withPageable(pageable)
-                .build();
+            // Собираем ID уже найденных видео, чтобы не дублировать их
+            List<String> excludeIds = combinedContent.stream()
+                    .map(dto -> dto.getVideoId().toString())
+                    .toList();
 
-        // 4. Выполняем поиск
-        SearchHits<SearchIndexDoc> hits = elasticsearchOperations.search(query, SearchIndexDoc.class);
+            Query randomQuery = NativeQuery.builder()
+                    .withQuery(q -> q.functionScore(fs -> fs
+                            .query(query -> query.bool(b -> b
+                                    .filter(f -> f.term(t -> t.field("entityType").value("VIDEO")))
+                                    .mustNot(m -> m.ids(ids -> ids.values(excludeIds))) // Исключаем уже найденные
+                            ))
+                            .functions(f -> f.randomScore(rs -> rs)) // Примешиваем случайность
+                    ))
+                    .withPageable(PageRequest.of(0, needMore)) // Берем только столько, сколько не хватает
+                    .build();
 
-        // 5. Маппим результаты из SearchIndexDoc в RecommendationDtoOut
-        // Здесь предполагается наличие конструктора или маппера
-        List<RecommendationDtoOut> content = hits.getSearchHits().stream()
-                .map(hit -> {
-                    SearchIndexDoc doc = hit.getContent();
-                    return new RecommendationDtoOut(
-                            UUID.fromString(doc.getId())
-                    );
-                })
-                .toList();
+            SearchHits<SearchIndexDoc> randomHits = elasticsearchOperations.search(randomQuery, SearchIndexDoc.class);
 
-        // 6. Возвращаем страницу, передавая контент, объект пагинации и общее кол-во найденных элементов
-        return new PageImpl<>(content, pageable, hits.getTotalHits());
+            randomHits.getSearchHits().forEach(hit ->
+                    combinedContent.add(new RecommendationDtoOut(UUID.fromString(hit.getContent().getId())))
+            );
+
+            // Обновляем общее количество (виртуально), чтобы пагинация не ломалась сразу
+            if (totalHits < combinedContent.size()) {
+                totalHits = combinedContent.size();
+            }
+        }
+
+        return new PageImpl<>(combinedContent, pageable, totalHits);
     }
 
 }

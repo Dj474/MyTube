@@ -2,7 +2,86 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Hls from 'hls.js';
 import api from './api';
-import { User, MessageSquare, ThumbsUp, Clock, Tag as TagIcon, ChevronLeft, Play } from 'lucide-react';
+import { 
+  ThumbsUp, Clock, ChevronLeft, PlusCircle, X, 
+  ListMusic, User, Heart, PlayCircle, Flag, AlertTriangle, Send 
+} from 'lucide-react';
+
+// --- КОМПОНЕНТ АВТОРА ---
+const AuthorProfile = ({ userId, size = "40px", showNickname = true }) => {
+  const [profile, setProfile] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchAuthorData = async () => {
+      if (!userId || userId === "undefined") return;
+      try {
+        const res = await api.get(`/profile/${userId}`);
+        if (!isMounted) return;
+        setProfile(res.data);
+        const photoPath = res.data.photoUrl || res.data.avatarUrl;
+        if (photoPath) {
+          const imgRes = await api.get(photoPath, { responseType: 'blob' });
+          if (isMounted) {
+            const objectUrl = URL.createObjectURL(imgRes.data);
+            setAvatarUrl(objectUrl);
+          }
+        }
+      } catch (err) {
+        console.warn("Не удалось загрузить данные автора:", userId);
+      }
+    };
+    fetchAuthorData();
+    return () => {
+      isMounted = false;
+      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
+    };
+  }, [userId]);
+
+  return (
+    <div 
+      onClick={(e) => { e.stopPropagation(); navigate(`/profile/${userId}`); }} 
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+    >
+      <div style={{ 
+        width: size, height: size, borderRadius: '50%', overflow: 'hidden', 
+        backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        border: '1px solid #475569'
+      }}>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <User size={parseInt(size) * 0.5} color="#94a3b8" />
+        )}
+      </div>
+      {showNickname && (
+        <span style={{ fontWeight: '700', color: '#f8fafc', fontSize: '0.95rem' }}>
+          {profile?.nickname || profile?.firstName || '...'}
+        </span>
+      )}
+    </div>
+  );
+};
+
+// --- ВСПОМОГАТЕЛЬНЫЙ КОМПОНЕНТ ДЛЯ ИЗОБРАЖЕНИЙ ---
+const SecureImage = ({ path, style, alt = "" }) => {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let isMounted = true;
+    if (!path) return;
+    api.get(path, { responseType: 'blob' })
+      .then(res => {
+        if (isMounted) setUrl(URL.createObjectURL(res.data));
+      })
+      .catch(() => {});
+    return () => { isMounted = false; if (url) URL.revokeObjectURL(url); };
+  }, [path]);
+
+  if (!url) return <div style={{ ...style, background: '#1e293b' }} />;
+  return <img src={url} alt={alt} style={{ ...style, objectFit: 'cover' }} />;
+};
 
 const VideoPlayerPage = () => {
   const { id } = useParams();
@@ -12,70 +91,47 @@ const VideoPlayerPage = () => {
   
   const [videoData, setVideoData] = useState(null);
   const [comments, setComments] = useState([]);
-  const [recommendations, setRecommendations] = useState([]); // Состояние для рекомендаций
+  const [recommendations, setRecommendations] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
+  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
 
-  // 1. Функция записи в историю (отправка события на бэкенд)
-  const recordVideoView = async () => {
-    try {
-      // Отправляем ID видео. UserId бэкенд вытащит из заголовков/токена
-      await api.post('/video/history', { videoId: id });
-    } catch (err) {
-      console.error("Ошибка при сохранении истории просмотра:", err);
-    }
+  // Состояния для модалки жалоб
+  const [reportModal, setReportModal] = useState({ isOpen: false, type: null, targetId: null });
+  const [reportForm, setReportForm] = useState({ reason: 'SPAM', description: '' });
+
+  const formatDate = (d) => {
+    if (!d) return "";
+    const date = Array.isArray(d) ? new Date(d[0], d[1]-1, d[2]) : new Date(d);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  // 2. Загрузка данных видео и комментариев
   useEffect(() => {
-    const loadData = async () => {
+    const loadPage = async () => {
       try {
         setLoading(true);
-        const [videoRes, commentsRes] = await Promise.all([
+        const [vRes, cRes, recRes] = await Promise.all([
           api.get(`/videos/${id}`),
-          api.get(`/comments/${id}`, { params: { size: 50, sort: 'createdAt,desc' } }).catch(() => ({ data: { content: [] } }))
+          api.get(`/comments/${id}`, { params: { size: 50, sort: 'createdAt,desc' } }).catch(() => ({ data: { content: [] } })),
+          api.get(`/videos`, { params: { size: 10 } }).catch(() => ({ data: { content: [] } }))
         ]);
         
-        setVideoData(videoRes.data);
-        setComments(commentsRes.data.content || []);
-        
-        // Сразу после загрузки данных видео — записываем просмотр
-        recordVideoView();
-
+        setVideoData(vRes.data);
+        setComments(cRes.data.content || []);
+        setRecommendations(recRes.data.content?.filter(v => v.id !== id) || []);
+        api.post('/videos/history', { videoId: id }).catch(() => {});
       } catch (err) {
-        setError("Не удалось загрузить видео.");
+        console.error("Ошибка загрузки:", err);
       } finally {
         setLoading(false);
       }
     };
-    loadData();
+    loadPage();
   }, [id]);
 
-  // 3. Загрузка рекомендаций (вызывается после того, как получили данные текущего видео)
   useEffect(() => {
-    const fetchRecommendations = async () => {
-      try {
-        // Эндпоинт твоего recommendation-service
-        const res = await api.get('/video/recommendations', { params: { size: 6 } });
-        setRecommendations(res.data.content || []);
-      } catch (err) {
-        console.warn("Рекомендации не удалось загрузить");
-      }
-    };
-
-    if (videoData) {
-      fetchRecommendations();
-    }
-  }, [id, videoData]);
-
-  // Настройка HLS плеера
-  useEffect(() => {
-    if (!videoData || !videoRef.current) return;
-    
-    const hlsUrl = videoData.s3Key; 
-    if (!hlsUrl) return;
-
+    if (!videoData?.s3Key || !videoRef.current) return;
     if (Hls.isSupported()) {
       const hls = new Hls({
         xhrSetup: (xhr) => {
@@ -83,237 +139,238 @@ const VideoPlayerPage = () => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }
       });
-      hls.loadSource(hlsUrl);
+      hls.loadSource(videoData.s3Key);
       hls.attachMedia(videoRef.current);
       hlsRef.current = hls;
-    } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-      videoRef.current.src = hlsUrl;
     }
     return () => hlsRef.current?.destroy();
   }, [videoData]);
 
-  const handleVideoLike = async () => {
-    if (!videoData) return;
-    const wasLiked = videoData.isLiked;
-    
-    setVideoData(prev => ({
-      ...prev,
-      isLiked: !wasLiked,
-      amountOfLikes: wasLiked ? prev.amountOfLikes - 1 : prev.amountOfLikes + 1
+  const handleLikeVideo = async () => {
+    const active = videoData.isLiked;
+    setVideoData(prev => ({ 
+      ...prev, isLiked: !active, 
+      amountOfLikes: active ? prev.amountOfLikes - 1 : prev.amountOfLikes + 1 
     }));
-
-    try {
-      if (wasLiked) {
-        await api.delete(`/videos/like/${id}`);
-      } else {
-        await api.post(`/videos/like/${id}`);
-      }
-    } catch (err) {
-      setVideoData(prev => ({
-        ...prev,
-        isLiked: wasLiked,
-        amountOfLikes: wasLiked ? prev.amountOfLikes + 1 : prev.amountOfLikes - 1
-      }));
-    }
+    try { active ? await api.delete(`/videos/like/${id}`) : await api.post(`/videos/like/${id}`); } catch {}
   };
 
-  const handleCommentLike = async (commentId) => {
-    const targetComment = comments.find(c => c.id === commentId);
-    if (!targetComment) return;
-    const wasLiked = targetComment.isLiked;
-
-    setComments(prev => prev.map(c => 
-      c.id === commentId 
-        ? { ...c, isLiked: !wasLiked, amountOfLikes: wasLiked ? c.amountOfLikes - 1 : c.amountOfLikes + 1 }
-        : c
-    ));
-
-    try {
-      if (wasLiked) {
-        await api.delete(`/comments/like/${commentId}`);
-      } else {
-        await api.post(`/comments/like/${commentId}`);
-      }
-    } catch (err) {
-      setComments(prev => prev.map(c => 
-        c.id === commentId 
-          ? { ...c, isLiked: wasLiked, amountOfLikes: wasLiked ? c.amountOfLikes + 1 : c.amountOfLikes - 1 }
-          : c
-      ));
-    }
-  };
-
-  const handleSendComment = async (e) => {
-    e.preventDefault();
+  const handleSendComment = async () => {
     if (!newComment.trim()) return;
     try {
-      const response = await api.post('/comments', { videoId: id, content: newComment, parentId: null });
-      setComments((prev) => [response.data, ...prev]);
+      const res = await api.post('/comments', { videoId: id, content: newComment });
+      setComments(prev => [res.data, ...prev]);
       setNewComment("");
+    } catch { alert("Ошибка отправки"); }
+  };
+
+  // --- ЛОГИКА ОТПРАВКИ ЖАЛОБЫ ---
+  const submitReport = async () => {
+    try {
+      const endpoint = reportModal.type === 'video' 
+        ? `/videos/report/${id}` 
+        : `/comments/report/${reportModal.targetId}`;
+      
+      await api.post(endpoint, reportForm);
+      alert("Жалоба успешно отправлена");
+      setReportModal({ isOpen: false, type: null, targetId: null });
+      setReportForm({ reason: 'SPAM', description: '' });
     } catch (err) {
-      alert("Ошибка отправки");
+      alert(err.response?.data?.message || "Ошибка при отправке жалобы");
     }
   };
 
   if (loading) return <div style={centerStyle}>Загрузка...</div>;
-  if (error) return <div style={centerStyle}>{error}</div>;
 
   return (
-    <div style={{ backgroundColor: '#0f172a', minHeight: '100vh', color: '#f1f5f9', padding: '24px' }}>
-      <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', gap: '30px', flexDirection: 'row', flexWrap: 'wrap' }}>
+    <div style={{ backgroundColor: '#0f172a', minHeight: '100vh', color: '#f1f5f9', padding: '20px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         
-        {/* ЛЕВАЯ КОЛОНКА: ПЛЕЕР И ИНФО */}
-        <div style={{ flex: '1 1 850px' }}>
+        <button onClick={() => navigate(-1)} style={backButtonStyle}>
+          <ChevronLeft size={20} /> Назад
+        </button>
+
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '40px' }}>
           
-          <button onClick={() => navigate(-1)} style={backButtonStyle}>
-            <ChevronLeft size={20} /> Назад
-          </button>
+          {/* ЛЕВАЯ ЧАСТЬ */}
+          <div>
+            <div style={playerWrapper}>
+              <video ref={videoRef} controls style={{ width: '100%', height: '100%' }} />
+            </div>
+            
+            <h1 style={{ fontSize: '1.6rem', margin: '24px 0 16px 0' }}>{videoData?.title}</h1>
 
-          <div style={playerContainerStyle}>
-            <video ref={videoRef} controls playsInline style={{ width: '100%', height: '100%' }} />
-          </div>
-
-          <div style={{ marginTop: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>
-                {videoData?.title}
-              </h1>
-              
-              <button onClick={handleVideoLike} style={{ ...likeButtonStyle, backgroundColor: videoData?.isLiked ? '#3b82f6' : '#1e293b', color: videoData?.isLiked ? 'white' : '#94a3b8' }}>
-                <ThumbsUp size={20} fill={videoData?.isLiked ? "white" : "none"} />
-                <span style={{ fontWeight: '600' }}>{videoData?.amountOfLikes || 0}</span>
-              </button>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <AuthorProfile userId={videoData?.userId} size="50px" />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button 
+                  onClick={() => setReportModal({ isOpen: true, type: 'video', targetId: id })} 
+                  style={{ ...actionBtn, color: '#f87171' }} 
+                  title="Пожаловаться на видео"
+                >
+                  <Flag size={18}/>
+                </button>
+                <button onClick={() => {
+                  api.get('/videos/playlist/my').then(r => setPlaylists(r.data.content));
+                  setIsPlaylistModalOpen(true);
+                }} style={actionBtn}>
+                  <PlusCircle size={18}/> Сохранить
+                </button>
+                <button onClick={handleLikeVideo} style={{ ...actionBtn, background: videoData?.isLiked ? '#3b82f6' : '#1e293b' }}>
+                  <ThumbsUp size={18} fill={videoData?.isLiked ? "white" : "none"} /> {videoData?.amountOfLikes}
+                </button>
+              </div>
             </div>
 
-            {videoData?.tags && videoData.tags.length > 0 && (
-              <div style={tagContainerStyle}>
-                {videoData.tags.map(tag => (
-                  <span key={tag.id} style={tagChipStyle} onClick={() => navigate(`/search?tagId=${tag.id}`)}>
-                    #{tag.displayName}
-                  </span>
+            <div style={descriptionBox}>
+              <div style={metaDate}><Clock size={14}/> {formatDate(videoData?.date)}</div>
+              <p style={{ lineHeight: '1.6', color: '#cbd5e1' }}>{videoData?.description}</p>
+            </div>
+
+            {/* КОММЕНТАРИИ */}
+            <div style={{ marginTop: '40px' }}>
+              <h3 style={{ marginBottom: '20px' }}>Комментарии ({comments.length})</h3>
+              
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
+                <textarea 
+                  style={textareaStyle} 
+                  value={newComment} 
+                  onChange={e => setNewComment(e.target.value)} 
+                  placeholder="Оставьте комментарий..." 
+                />
+                <button onClick={handleSendComment} style={submitBtn}>Отправить</button>
+              </div>
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {comments.map(c => (
+                  <div key={c.id} style={{ borderBottom: '1px solid #1e293b', paddingBottom: '20px' }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                      <AuthorProfile userId={c.userId} size="40px" />
+                      <div style={{ flex: 1, paddingTop: '4px' }}>
+                        <div style={{ color: '#e2e8f0', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                          {c.content}
+                        </div>
+                        <button 
+                          onClick={() => setReportModal({ isOpen: true, type: 'comment', targetId: c.id })} 
+                          style={commentReportBtn}
+                        >
+                          <AlertTriangle size={14} /> <span style={{ fontSize: '0.8rem' }}>Пожаловаться</span>
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 ))}
               </div>
-            )}
-
-            <div style={descriptionBoxStyle}>
-              <div style={metaRowStyle}>
-                <Clock size={14} /> 
-                <span>Опубликовано: {videoData?.createdAt ? new Date(videoData.createdAt).toLocaleDateString() : 'неизвестно'}</span>
-                <span style={{ marginLeft: '10px', color: '#3b82f6' }}>@{videoData?.authorNickname || 'User_' + videoData?.userId}</span>
-              </div>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap', lineHeight: '1.5' }}>
-                {videoData?.description || "Описание отсутствует"}
-              </p>
             </div>
           </div>
 
-          {/* КОММЕНТАРИИ */}
-          <div style={{ marginTop: '48px' }}>
-            <h3 style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '1.25rem' }}>
-              <MessageSquare size={22} color="#3b82f6" /> 
-              {comments.length} Комментариев
-            </h3>
-
-            <form onSubmit={handleSendComment} style={{ marginTop: '24px', display: 'flex', gap: '16px' }}>
-              <div style={avatarStyle}><User size={20} /></div>
-              <div style={{ flex: 1 }}>
-                <textarea 
-                   value={newComment} 
-                   onChange={(e) => setNewComment(e.target.value)} 
-                   placeholder="Написать комментарий..." 
-                   style={textareaStyle} 
-                />
-                <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: '12px' }}>
-                  <button disabled={!newComment.trim()} style={submitButtonStyle}>Отправить</button>
-                </div>
-              </div>
-            </form>
-
-            <div style={{ marginTop: '32px', display: 'flex', flexDirection: 'column', gap: '28px' }}>
-              {comments.map((comment) => (
-                <div key={comment.id} style={{ display: 'flex', gap: '16px' }}>
-                  <div style={avatarSmallStyle}><User size={18} /></div>
-                  <div style={{ flex: 1 }}>
-                    <div style={commentMetaStyle}>
-                      <span style={{ fontWeight: '600', color: '#f1f5f9' }}>User_{comment.userId}</span>
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>{new Date(comment.createdAt).toLocaleString()}</span>
-                    </div>
-                    <p style={commentTextStyle}>{comment.content}</p>
-                    
-                    <button 
-                      onClick={() => handleCommentLike(comment.id)}
-                      style={{ ...commentLikeButtonStyle, color: comment.isLiked ? '#3b82f6' : '#94a3b8' }}
-                    >
-                      <ThumbsUp size={14} fill={comment.isLiked ? "#3b82f6" : "none"} />
-                      <span>{comment.amountOfLikes || 0}</span>
-                    </button>
+          {/* ПРАВАЯ ЧАСТЬ */}
+          <div>
+            <h3 style={{ marginBottom: '20px', fontSize: '1.1rem' }}>Похожие видео</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {recommendations.map(v => (
+                <div key={v.id} onClick={() => navigate(`/video/${v.id}`)} style={recCard}>
+                  <SecureImage path={v.thumbnailUrl} style={recImg} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={recTitle}>{v.title}</div>
+                    <div style={recDesc}>{v.description}</div>
                   </div>
                 </div>
               ))}
             </div>
           </div>
-        </div>
 
-        {/* ПРАВАЯ КОЛОНКА: ДИНАМИЧЕСКИЕ РЕКОМЕНДАЦИИ */}
-        <div style={{ flex: '1 1 350px' }}>
-          <h4 style={{ color: '#94a3b8', marginBottom: '20px', fontSize: '1.1rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
-             Рекомендуем посмотреть
-          </h4>
-          
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {recommendations.length > 0 ? (
-              recommendations.map((rec) => (
-                <div 
-                  key={rec.id} 
-                  onClick={() => navigate(`/video/${rec.id}`)}
-                  style={recCardStyle}
-                >
-                  <div style={recThumbnailStyle}>
-                    <Play size={20} color="white" opacity={0.5} />
-                  </div>
-                  <div style={{ flex: 1 }}>
-                    <div style={recTitleStyle}>{rec.title}</div>
-                    <div style={recMetaStyle}>@{rec.authorNickname || 'Автор'}</div>
-                    <div style={recMetaStyle}>{rec.entityType === 'VIDEO' ? 'Видео' : 'Курс'}</div>
-                  </div>
+        </div>
+      </div>
+
+      {/* МОДАЛКА ПЛЕЙЛИСТОВ */}
+      {isPlaylistModalOpen && (
+        <div style={modalOverlay} onClick={() => setIsPlaylistModalOpen(false)}>
+          <div style={modalContent} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>Добавить в плейлист</h3>
+              <X cursor="pointer" onClick={() => setIsPlaylistModalOpen(false)} />
+            </div>
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {playlists.map(pl => (
+                <div key={pl.id} style={playlistRow} onClick={() => {
+                  api.post(`/videos/playlist/${pl.id}/videos/${id}`).then(() => setIsPlaylistModalOpen(false));
+                }}>
+                  <ListMusic size={18} color="#3b82f6" /> {pl.title}
                 </div>
-              ))
-            ) : (
-              <div style={sidebarPlaceholderStyle}>
-                <p>Здесь появятся видео, подобранные специально для вас</p>
-              </div>
-            )}
+              ))}
+            </div>
           </div>
         </div>
+      )}
 
-      </div>
+      {/* --- МОДАЛКА ЖАЛОБЫ (НОВАЯ) --- */}
+      {reportModal.isOpen && (
+        <div style={modalOverlay} onClick={() => setReportModal({ isOpen: false, type: null, targetId: null })}>
+          <div style={modalContent} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>Пожаловаться на {reportModal.type === 'video' ? 'видео' : 'комментарий'}</h3>
+              <X cursor="pointer" onClick={() => setReportModal({ isOpen: false, type: null, targetId: null })} />
+            </div>
+            
+            <div style={{ marginBottom: '15px' }}>
+              <label style={labelStyle}>Причина</label>
+              <select 
+                style={selectStyle}
+                value={reportForm.reason}
+                onChange={e => setReportForm({...reportForm, reason: e.target.value})}
+              >
+                <option value="SPAM">Спам</option>
+                <option value="HARASSMENT">Оскорбление</option>
+                <option value="VIOLENCE">Насилие</option>
+                <option value="COPYRIGHT">Авторские права</option>
+                <option value="OTHER">Другое</option>
+              </select>
+            </div>
+
+            <div style={{ marginBottom: '20px' }}>
+              <label style={labelStyle}>Описание (необязательно)</label>
+              <textarea 
+                style={{ ...textareaStyle, width: '100%', minHeight: '80px' }}
+                placeholder="Расскажите подробнее..."
+                value={reportForm.description}
+                onChange={e => setReportForm({...reportForm, description: e.target.value})}
+              />
+            </div>
+
+            <button onClick={submitReport} style={reportSubmitBtn}>
+              <Send size={16} /> Отправить жалобу
+            </button>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 };
 
 // --- СТИЛИ ---
+const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white', background: '#0f172a' };
+const backButtonStyle = { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', marginBottom: '20px' };
+const playerWrapper = { width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
+const actionBtn = { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '12px', border: 'none', color: 'white', cursor: 'pointer', background: '#1e293b', fontWeight: '600' };
+const descriptionBox = { background: '#1e293b', padding: '20px', borderRadius: '16px', border: '1px solid #334155' };
+const metaDate = { display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', marginBottom: '10px', fontSize: '0.85rem' };
+const textareaStyle = { flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', color: 'white', padding: '14px', resize: 'none', minHeight: '60px', outline: 'none' };
+const submitBtn = { background: '#3b82f6', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' };
 
-const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#0f172a', color: 'white' };
-const backButtonStyle = { background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '16px', fontSize: '0.9rem' };
-const playerContainerStyle = { width: '100%', background: '#000', borderRadius: '16px', overflow: 'hidden', aspectRatio: '16/9', border: '1px solid #334155', boxShadow: '0 10px 30px rgba(0,0,0,0.5)' };
-const likeButtonStyle = { display: 'flex', alignItems: 'center', gap: '10px', padding: '10px 20px', borderRadius: '24px', border: 'none', cursor: 'pointer', transition: '0.2s ease' };
-const tagContainerStyle = { display: 'flex', flexWrap: 'wrap', gap: '8px', marginTop: '16px' };
-const tagChipStyle = { backgroundColor: '#1e293b', color: '#3b82f6', padding: '6px 14px', borderRadius: '18px', fontSize: '0.85rem', fontWeight: '600', border: '1px solid #334155', cursor: 'pointer', transition: '0.2s' };
-const descriptionBoxStyle = { backgroundColor: '#1e293b', padding: '20px', borderRadius: '12px', marginTop: '20px', color: '#cbd5e1', border: '1px solid #334155' };
-const metaRowStyle = { display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.85rem', color: '#94a3b8', marginBottom: '12px', borderBottom: '1px solid #334155', paddingBottom: '10px' };
-const avatarStyle = { width: '44px', height: '44px', borderRadius: '50%', background: '#3b82f6', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
-const avatarSmallStyle = { width: '38px', height: '38px', borderRadius: '50%', background: '#1e293b', border: '1px solid #475569', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 };
-const textareaStyle = { width: '100%', background: 'transparent', border: 'none', borderBottom: '2px solid #334155', color: 'white', outline: 'none', padding: '8px 0', resize: 'none', fontSize: '1rem' };
-const submitButtonStyle = { background: '#3b82f6', color: 'white', border: 'none', padding: '10px 24px', borderRadius: '24px', cursor: 'pointer', fontWeight: '700' };
-const commentMetaStyle = { display: 'flex', gap: '12px', alignItems: 'center', marginBottom: '6px' };
-const commentTextStyle = { margin: '0 0 8px 0', fontSize: '1rem', color: '#cbd5e1', lineHeight: '1.4' };
-const commentLikeButtonStyle = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: '4px 0' };
-const sidebarPlaceholderStyle = { padding: '40px 20px', border: '2px dashed #334155', borderRadius: '16px', textAlign: 'center', color: '#475569', fontSize: '0.9rem' };
+const commentReportBtn = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginTop: '8px', padding: 0, display: 'flex', alignItems: 'center', gap: '4px', transition: '0.2s' };
+const labelStyle = { display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' };
+const selectStyle = { width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '10px', color: 'white', outline: 'none' };
+const reportSubmitBtn = { width: '100%', background: '#ef4444', border: 'none', color: 'white', padding: '12px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
 
-// Стили карточек рекомендаций
-const recCardStyle = { display: 'flex', gap: '12px', cursor: 'pointer', padding: '8px', borderRadius: '12px', transition: 'background 0.2s', backgroundColor: 'transparent' };
-const recThumbnailStyle = { width: '140px', height: '80px', backgroundColor: '#1e293b', borderRadius: '8px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '1px solid #334155' };
-const recTitleStyle = { fontSize: '0.95rem', fontWeight: '600', color: '#f1f5f9', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden', lineHeight: '1.3' };
-const recMetaStyle = { fontSize: '0.8rem', color: '#94a3b8', marginTop: '4px' };
+const recCard = { display: 'flex', gap: '12px', cursor: 'pointer', background: '#1e293b', padding: '8px', borderRadius: '12px' };
+const recImg = { width: '140px', height: '80px', borderRadius: '8px', flexShrink: 0 };
+const recTitle = { fontSize: '0.9rem', fontWeight: 'bold', color: '#f1f5f9', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
+const recDesc = { fontSize: '0.8rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modalContent = { background: '#1e293b', padding: '25px', borderRadius: '24px', width: '400px', border: '1px solid #334155', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' };
+const playlistRow = { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', cursor: 'pointer', borderRadius: '10px', background: '#0f172a', marginBottom: '8px' };
 
 export default VideoPlayerPage;

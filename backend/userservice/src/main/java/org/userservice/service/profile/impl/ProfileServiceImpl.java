@@ -13,10 +13,13 @@ import org.userservice.dto.profile.ProfileDtoOut;
 import org.userservice.entity.profile.Profile;
 import org.userservice.entity.user.User;
 import org.userservice.exception.NotFoundException;
+import org.userservice.other.record.kafka.UserForSearchRecord;
 import org.userservice.repository.user.UserRepository;
 import org.userservice.repository.userProfile.UserProfileRepository;
+import org.userservice.service.kafka.KafkaProducerService;
 import org.userservice.service.minio.StorageService;
 import org.userservice.service.profile.ProfileService;
+import org.userservice.service.subscription.SubscriptionService;
 import org.userservice.service.user.UserService;
 
 import java.io.InputStream;
@@ -29,6 +32,8 @@ public class ProfileServiceImpl implements ProfileService {
     private final UserProfileRepository userProfileRepository;
     private final UserRepository userRepository;
     private final StorageService storageService;
+    private final KafkaProducerService kafkaService;
+    private final SubscriptionService subscriptionService;
 
     @Override
     @Transactional
@@ -58,15 +63,26 @@ public class ProfileServiceImpl implements ProfileService {
 
         Profile savedProfile = userProfileRepository.save(profile);
 
+        kafkaService.sendSearchEvent(new UserForSearchRecord(currentUser.getId(), currentUser.getUsername(), savedProfile.getBio()));
+
         return convertToResponse(savedProfile);
     }
 
     @Override
     @Transactional(readOnly = true)
     public ProfileDtoOut getProfile(Long userId) {
+
+        User curr = userService.getCurrent();
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
-        return getProfileResponse(user);
+        ProfileDtoOut dto = getProfileResponse(user);
+
+        if (!curr.equals(user)) {
+            dto.setIsSubscribed(subscriptionService.subscriptionExists(curr, user));
+        }
+
+        return dto;
     }
 
     @Override

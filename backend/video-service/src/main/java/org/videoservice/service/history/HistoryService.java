@@ -1,5 +1,6 @@
 package org.videoservice.service.history;
 
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +19,8 @@ import org.videoservice.repository.video.VideoRepository;
 import org.videoservice.service.kafka.KafkaProducerService;
 import org.videoservice.specification.PageableParams;
 
+import java.util.stream.Collectors;
+
 @Service
 @RequiredArgsConstructor
 public class HistoryService {
@@ -27,20 +30,30 @@ public class HistoryService {
     private final KafkaProducerService kafkaService;
     private final HistoryMapper historyMapper;
 
+    @Transactional
     public void addToHistory(HistoryDtoIn dto, Long userId) {
         Video video = videoRepository.byId(dto.getVideoId());
+
+        historyRepository.deleteAllByUserIdAndVideoId(userId, dto.getVideoId());
+
+        historyRepository.flush();
+
         History history = historyRepository.save(new History(userId, video));
 
-        StringBuilder stringTags = new StringBuilder();
-        for (Tag tag : video.getTags()){
-            stringTags.append(tag.getDisplayName()).append(" ");
-        }
+        String stringTags = video.getTags().stream()
+                .map(Tag::getDisplayName)
+                .collect(Collectors.joining(" "));
 
-        kafkaService.sendHistoryEvent(new VideoHistoryEvent(history.getId(), history.getUserId(), history.getVideo().getId(), stringTags.toString()));
+        kafkaService.sendHistoryEvent(new VideoHistoryEvent(
+                history.getId(),
+                history.getUserId(),
+                history.getVideo().getId(),
+                stringTags
+        ));
     }
 
     public Page<HistoryDtoOut> getHistory(PageableParams params, Long userId){
-        Pageable pageable = params.toPageable(Sort.by(Sort.Direction.ASC, History_.CREATED_AT));
+        Pageable pageable = params.toPageable(Sort.by(Sort.Direction.DESC, History_.CREATED_AT));
         Page<History> histories = historyRepository.findByUserId(userId, pageable);
         return histories.map(historyMapper::toDto);
     }

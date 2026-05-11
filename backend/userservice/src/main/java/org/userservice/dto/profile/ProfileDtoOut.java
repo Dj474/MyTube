@@ -22,4 +22,5 @@ public class ProfileDtoOut {
     private String gender;
     private LocalDateTime updatedAt;
     private String photoUrl;
+    private Boolean isSubscribed;
 }
