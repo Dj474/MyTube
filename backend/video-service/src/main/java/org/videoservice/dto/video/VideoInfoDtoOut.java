@@ -5,6 +5,7 @@ import lombok.Data;
 import org.videoservice.dto.tag.TagDtoOut;
 import org.videoservice.other.enums.VideoStatus;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -19,6 +20,8 @@ public class VideoInfoDtoOut {
     private VideoStatus status;
     private String thumbnailUrl;
     private Long userId;
+
+    private LocalDateTime date;
 
     private Long amountOfLikes = 0L;
     private Boolean isLiked = false;

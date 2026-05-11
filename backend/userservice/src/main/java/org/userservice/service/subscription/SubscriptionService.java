@@ -65,4 +65,8 @@ public class SubscriptionService {
         return page.map(subscriptionMapper::toDto);
     }
 
+    public boolean subscriptionExists(User follower, User author) {
+        return subscriptionRepository.existsByFollowerAndAuthor(follower, author);
+    }
+
 }

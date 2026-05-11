@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import api from './api';
-import { User, MapPin, Calendar, Edit3, Save, X, UserCircle, Camera } from 'lucide-react';
+import { 
+  User, MapPin, Calendar, Edit3, Save, X, 
+  UserCircle, Camera, UserPlus, UserMinus 
+} from 'lucide-react';
 
 const ProfilePage = () => {
   const { userId } = useParams(); 
   const currentUserId = localStorage.getItem('userId');
   
-  // КРИТИЧЕСКОЕ ИСПРАВЛЕНИЕ: Проверяем, что userId не является строкой "undefined"
   const effectiveUserId = (userId && userId !== "undefined") ? userId : null;
   const isMyProfile = !effectiveUserId || effectiveUserId.toString() === currentUserId?.toString();
   
@@ -17,6 +19,9 @@ const ProfilePage = () => {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({});
   const [avatarUrl, setAvatarUrl] = useState(null);
+  
+  // Состояние подписки, которое будем менять локально после клика
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const fetchAvatar = async (path) => {
     if (!path) {
@@ -34,12 +39,9 @@ const ProfilePage = () => {
 
   useEffect(() => {
     const fetchProfile = async () => {
-      // Определяем, чей профиль грузить
       const targetId = effectiveUserId || currentUserId;
       
-      // Если вообще нет никакого ID — выходим
       if (!targetId || targetId === "undefined") {
-        console.error("ProfilePage: ID не найден!");
         setLoading(false);
         return;
       }
@@ -49,6 +51,9 @@ const ProfilePage = () => {
         const response = await api.get(`/profile/${targetId}`);
         setProfile(response.data);
         setFormData(response.data);
+        
+        // --- ВОТ ТУТ: Используем поле из твоего DTO ---
+        setIsSubscribed(response.data.isSubscribed); 
         
         if (response.data.photoUrl) {
           fetchAvatar(response.data.photoUrl);
@@ -65,7 +70,23 @@ const ProfilePage = () => {
     return () => {
       if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     };
-  }, [effectiveUserId, currentUserId]); // Следим за корректным ID
+  }, [effectiveUserId, currentUserId]);
+
+  const handleSubscribe = async () => {
+  try {
+    if (isSubscribed) {
+      // DELETE /api/v1/subscription?authorId=123
+      await api.delete(`/subscription`, { params: { authorId: effectiveUserId } });
+      setIsSubscribed(false);
+    } else {
+      // POST /api/v1/subscription?authorId=123
+      await api.post(`/subscription`, null, { params: { authorId: effectiveUserId } });
+      setIsSubscribed(true);
+    }
+  } catch (err) {
+    console.error("Ошибка подписки:", err);
+  }
+};
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
@@ -127,12 +148,28 @@ const ProfilePage = () => {
               <p style={{ color: '#94a3b8', marginTop: '5px' }}>@{profile.nickname || `id${profile.userId}`}</p>
             </div>
             
-            {isMyProfile && (
+            {/* КНОПКА: Переключается в зависимости от того, мой это профиль или чужой */}
+            {isMyProfile ? (
               <button 
                 onClick={() => { setIsEditing(!isEditing); setFormData(profile); }}
                 style={{ ...buttonBase, background: isEditing ? '#334155' : '#3b82f6' }}
               >
                 {isEditing ? <><X size={18}/> Отмена</> : <><Edit3 size={18}/> Редактировать</>}
+              </button>
+            ) : (
+              <button 
+                onClick={handleSubscribe}
+                style={{ 
+                  ...buttonBase, 
+                  background: isSubscribed ? '#334155' : '#ef4444', // Красный для отписки или серый на выбор
+                  border: isSubscribed ? '1px solid #475569' : 'none'
+                }}
+              >
+                {isSubscribed ? (
+                  <><UserMinus size={18}/> Отписаться</>
+                ) : (
+                  <><UserPlus size={18}/> Подписаться</>
+                )}
               </button>
             )}
           </div>
@@ -201,6 +238,7 @@ const ProfilePage = () => {
   );
 };
 
+// Стили без изменений
 const containerStyle = { maxWidth: '800px', margin: '0 auto', background: '#1e293b', borderRadius: '24px', overflow: 'hidden', border: '1px solid #334155' };
 const headerBannerStyle = { height: '150px', background: 'linear-gradient(90deg, #1e3a8a 0%, #3b82f6 100%)', position: 'relative' };
 const avatarContainerStyle = { position: 'absolute', bottom: '-50px', left: '40px', width: '120px', height: '120px', borderRadius: '50%', background: '#0f172a', border: '4px solid #1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' };
@@ -215,7 +253,7 @@ const infoBlockStyle = { display: 'flex', alignItems: 'flex-start', gap: '12px' 
 const infoLabelStyle = { fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase' };
 const infoValueStyle = { fontSize: '1rem', color: '#cbd5e1' };
 const sectionTitleStyle = { fontSize: '0.9rem', color: '#3b82f6', textTransform: 'uppercase', marginBottom: '10px' };
-const buttonBase = { display: 'flex', alignItems: 'center', gap: '8px', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer' };
+const buttonBase = { display: 'flex', alignItems: 'center', gap: '8px', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '12px', cursor: 'pointer', transition: '0.2s' };
 const saveButtonStyle = { background: '#10b981', color: 'white', border: 'none', padding: '12px 30px', borderRadius: '12px', cursor: 'pointer' };
 
 export default ProfilePage;

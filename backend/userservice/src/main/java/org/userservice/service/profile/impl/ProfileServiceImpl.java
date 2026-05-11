@@ -19,6 +19,7 @@ import org.userservice.repository.userProfile.UserProfileRepository;
 import org.userservice.service.kafka.KafkaProducerService;
 import org.userservice.service.minio.StorageService;
 import org.userservice.service.profile.ProfileService;
+import org.userservice.service.subscription.SubscriptionService;
 import org.userservice.service.user.UserService;
 
 import java.io.InputStream;
@@ -32,6 +33,7 @@ public class ProfileServiceImpl implements ProfileService {
     private final UserRepository userRepository;
     private final StorageService storageService;
     private final KafkaProducerService kafkaService;
+    private final SubscriptionService subscriptionService;
 
     @Override
     @Transactional
@@ -69,9 +71,18 @@ public class ProfileServiceImpl implements ProfileService {
     @Override
     @Transactional(readOnly = true)
     public ProfileDtoOut getProfile(Long userId) {
+
+        User curr = userService.getCurrent();
+
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException("User not found with id: " + userId));
-        return getProfileResponse(user);
+        ProfileDtoOut dto = getProfileResponse(user);
+
+        if (!curr.equals(user)) {
+            dto.setIsSubscribed(subscriptionService.subscriptionExists(curr, user));
+        }
+
+        return dto;
     }
 
     @Override

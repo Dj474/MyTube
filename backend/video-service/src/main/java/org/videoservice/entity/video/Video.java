@@ -8,6 +8,7 @@ import org.videoservice.entity.history.History;
 import org.videoservice.entity.tag.Tag;
 import org.videoservice.other.enums.VideoStatus;
 
+import java.time.LocalDateTime;
 import java.time.OffsetDateTime;
 import java.util.HashSet;
 import java.util.List;
@@ -47,11 +48,11 @@ public class Video {
 
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
-    private OffsetDateTime createdAt;
+    private LocalDateTime createdAt;
 
     @UpdateTimestamp
     @Column(name = "updated_at")
-    private OffsetDateTime updatedAt;
+    private LocalDateTime updatedAt;
 
     @ManyToMany
     @JoinTable(

@@ -3,56 +3,92 @@ import { useParams, useNavigate } from 'react-router-dom';
 import Hls from 'hls.js';
 import api from './api';
 import { 
-  User, 
-  MessageSquare, 
-  ThumbsUp, 
-  Clock, 
-  ChevronLeft, 
-  Film,
-  Image as ImageIcon
+  ThumbsUp, Clock, ChevronLeft, PlusCircle, X, 
+  ListMusic, User, Heart, PlayCircle 
 } from 'lucide-react';
 
-// --- Компонент для загрузки защищенных превью (как в RecommendationsPage) ---
-const ProtectedThumbnail = ({ url }) => {
-  const [imageSrc, setImageSrc] = useState(null);
-  const [loading, setLoading] = useState(true);
+// --- КОМПОНЕНТ АВТОРА (ВАША РАБОЧАЯ ЛОГИКА) ---
+const AuthorProfile = ({ userId, size = "40px", showNickname = true }) => {
+  const [profile, setProfile] = useState(null);
+  const [avatarUrl, setAvatarUrl] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     let isMounted = true;
-    const fetchImage = async () => {
+    
+    const fetchAuthorData = async () => {
+      if (!userId || userId === "undefined") return;
       try {
-        const response = await api.get(url, { responseType: 'blob' });
-        if (isMounted) {
-          const objectUrl = URL.createObjectURL(response.data);
-          setImageSrc(objectUrl);
+        // 1. Запрос данных профиля
+        const res = await api.get(`/profile/${userId}`);
+        if (!isMounted) return;
+        setProfile(res.data);
+
+        // 2. Загрузка фото через Blob (для обхода защиты S3/Auth)
+        const photoPath = res.data.photoUrl || res.data.avatarUrl;
+        if (photoPath) {
+          const imgRes = await api.get(photoPath, { responseType: 'blob' });
+          if (isMounted) {
+            const objectUrl = URL.createObjectURL(imgRes.data);
+            setAvatarUrl(objectUrl);
+          }
         }
       } catch (err) {
-        console.error("Ошибка загрузки превью:", err);
-      } finally {
-        if (isMounted) setLoading(false);
+        console.warn("Не удалось загрузить данные автора:", userId);
       }
     };
 
-    if (url) fetchImage();
-    else setLoading(false);
+    fetchAuthorData();
 
     return () => {
       isMounted = false;
-      if (imageSrc) URL.revokeObjectURL(imageSrc);
+      if (avatarUrl) URL.revokeObjectURL(avatarUrl);
     };
-  }, [url]);
+  }, [userId]);
 
-  if (loading) return <div style={{ width: '100%', height: '100%', background: '#1e293b' }} />;
-  if (!imageSrc) return (
-    <div style={{ width: '100%', height: '100%', background: '#1e293b', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <ImageIcon size={24} color="#475569" />
+  return (
+    <div 
+      onClick={(e) => { e.stopPropagation(); navigate(`/profile/${userId}`); }} 
+      style={{ display: 'flex', alignItems: 'center', gap: '12px', cursor: 'pointer' }}
+    >
+      <div style={{ 
+        width: size, height: size, borderRadius: '50%', overflow: 'hidden', 
+        backgroundColor: '#334155', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+        border: '1px solid #475569'
+      }}>
+        {avatarUrl ? (
+          <img src={avatarUrl} alt="avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+        ) : (
+          <User size={parseInt(size) * 0.5} color="#94a3b8" />
+        )}
+      </div>
+      {showNickname && (
+        <span style={{ fontWeight: '700', color: '#f8fafc', fontSize: '0.95rem' }}>
+          {profile?.nickname || profile?.firstName || '...'}
+        </span>
+      )}
     </div>
   );
-
-  return <img src={imageSrc} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />;
 };
 
-// --- Основной компонент страницы плеера ---
+// --- ВСПОМОГАТЕЛЬНЫЙ КОМПОНЕНТ ДЛЯ ОБЫЧНЫХ ИЗОБРАЖЕНИЙ (ПРЕВЬЮ) ---
+const SecureImage = ({ path, style, alt = "" }) => {
+  const [url, setUrl] = useState(null);
+  useEffect(() => {
+    let isMounted = true;
+    if (!path) return;
+    api.get(path, { responseType: 'blob' })
+      .then(res => {
+        if (isMounted) setUrl(URL.createObjectURL(res.data));
+      })
+      .catch(() => {});
+    return () => { isMounted = false; if (url) URL.revokeObjectURL(url); };
+  }, [path]);
+
+  if (!url) return <div style={{ ...style, background: '#1e293b' }} />;
+  return <img src={url} alt={alt} style={{ ...style, objectFit: 'cover' }} />;
+};
+
 const VideoPlayerPage = () => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -64,89 +100,40 @@ const VideoPlayerPage = () => {
   const [recommendations, setRecommendations] = useState([]);
   const [newComment, setNewComment] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [playlists, setPlaylists] = useState([]);
+  const [isPlaylistModalOpen, setIsPlaylistModalOpen] = useState(false);
 
-  // 1. Запись в историю
-  const recordVideoView = async () => {
-    try {
-      await api.post('/videos/history', { videoId: id });
-    } catch (err) {
-      console.error("Ошибка при сохранении истории просмотра:", err);
-    }
+  const formatDate = (d) => {
+    if (!d) return "";
+    const date = Array.isArray(d) ? new Date(d[0], d[1]-1, d[2]) : new Date(d);
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long', year: 'numeric' });
   };
 
-  // 2. Основная загрузка данных видео и комментариев
   useEffect(() => {
-    let isMounted = true;
-    const loadData = async () => {
+    const loadPage = async () => {
       try {
         setLoading(true);
-        const [videoRes, commentsRes] = await Promise.all([
+        const [vRes, cRes, recRes] = await Promise.all([
           api.get(`/videos/${id}`),
-          api.get(`/comments/${id}`, { params: { size: 50, sort: 'createdAt,desc' } })
-            .catch(() => ({ data: { content: [] } }))
+          api.get(`/comments/${id}`, { params: { size: 50, sort: 'createdAt,desc' } }).catch(() => ({ data: { content: [] } })),
+          api.get(`/videos`, { params: { size: 10 } }).catch(() => ({ data: { content: [] } }))
         ]);
         
-        if (isMounted) {
-          setVideoData(videoRes.data);
-          setComments(commentsRes.data.content || []);
-          recordVideoView();
-        }
+        setVideoData(vRes.data);
+        setComments(cRes.data.content || []);
+        setRecommendations(recRes.data.content?.filter(v => v.id !== id) || []);
+        api.post('/videos/history', { videoId: id }).catch(() => {});
       } catch (err) {
-        if (isMounted) setError("Не удалось загрузить видео.");
+        console.error("Ошибка загрузки:", err);
       } finally {
-        if (isMounted) setLoading(false);
+        setLoading(false);
       }
     };
-    loadData();
-    return () => { isMounted = false; };
+    loadPage();
   }, [id]);
 
-  // 3. Загрузка рекомендаций (логика "обогащения" данных как на странице рекомендаций)
   useEffect(() => {
-    let isMounted = true;
-
-    const fetchRecommendations = async () => {
-      try {
-        // Получаем список рекомендаций (обычно там только ID)
-        const res = await api.get('/recommendation', { params: { page: 0, size: 10 } });
-        const recIds = res.data.content || [];
-
-        // Обогащаем каждый элемент, запрашивая полные данные видео
-        const enrichedVideos = await Promise.all(
-          recIds.map(async (item) => {
-            try {
-              // Важно: берем item.videoId, так как в ответе рекомендаций поле называется так
-              const videoRes = await api.get(`/videos/${item.videoId || item.id}`);
-              return videoRes.data;
-            } catch (e) {
-              return null;
-            }
-          })
-        );
-
-        if (isMounted) {
-          setRecommendations(enrichedVideos.filter(v => v !== null));
-        }
-      } catch (err) {
-        console.warn("Ошибка загрузки рекомендаций в сайдбаре:", err);
-      }
-    };
-
-    if (videoData) {
-      fetchRecommendations();
-    }
-
-    return () => { isMounted = false; };
-  }, [id, videoData]);
-
-  // 4. Настройка HLS
-  useEffect(() => {
-    if (!videoData || !videoRef.current) return;
-    
-    const hlsUrl = videoData.s3Key; 
-    if (!hlsUrl) return;
-
+    if (!videoData?.s3Key || !videoRef.current) return;
     if (Hls.isSupported()) {
       const hls = new Hls({
         xhrSetup: (xhr) => {
@@ -154,140 +141,163 @@ const VideoPlayerPage = () => {
           if (token) xhr.setRequestHeader('Authorization', `Bearer ${token}`);
         }
       });
-      hls.loadSource(hlsUrl);
+      hls.loadSource(videoData.s3Key);
       hls.attachMedia(videoRef.current);
       hlsRef.current = hls;
-    } else if (videoRef.current.canPlayType('application/vnd.apple.mpegurl')) {
-      videoRef.current.src = hlsUrl;
     }
-
-    return () => {
-      if (hlsRef.current) hlsRef.current.destroy();
-    };
+    return () => hlsRef.current?.destroy();
   }, [videoData]);
 
-  // --- Хендлеры лайков и комментариев (без изменений) ---
-  const handleVideoLike = async () => {
-    if (!videoData) return;
-    const wasLiked = videoData.isLiked;
-    setVideoData(prev => ({
-      ...prev,
-      isLiked: !wasLiked,
-      amountOfLikes: wasLiked ? prev.amountOfLikes - 1 : prev.amountOfLikes + 1
+  const handleLikeVideo = async () => {
+    const active = videoData.isLiked;
+    setVideoData(prev => ({ 
+      ...prev, isLiked: !active, 
+      amountOfLikes: active ? prev.amountOfLikes - 1 : prev.amountOfLikes + 1 
     }));
-    try {
-      if (wasLiked) await api.delete(`/videos/like/${id}`);
-      else await api.post(`/videos/like/${id}`);
-    } catch (err) { /* rollback logic */ }
+    try { active ? await api.delete(`/videos/like/${id}`) : await api.post(`/videos/like/${id}`); } catch {}
   };
 
-  const handleSendComment = async (e) => {
-    e.preventDefault();
+  const handleSendComment = async () => {
     if (!newComment.trim()) return;
     try {
-      const response = await api.post('/comments', { videoId: id, content: newComment, parentId: null });
-      setComments((prev) => [response.data, ...prev]);
+      const res = await api.post('/comments', { videoId: id, content: newComment });
+      setComments(prev => [res.data, ...prev]);
       setNewComment("");
-    } catch (err) { alert("Ошибка отправки комментария"); }
+    } catch { alert("Ошибка отправки"); }
   };
 
   if (loading) return <div style={centerStyle}>Загрузка...</div>;
-  if (error) return <div style={centerStyle}>{error}</div>;
 
   return (
-    <div style={{ backgroundColor: '#0f172a', minHeight: '100vh', color: '#f1f5f9', padding: '24px' }}>
-      <div style={{ maxWidth: '1440px', margin: '0 auto', display: 'flex', gap: '30px', flexDirection: 'row', flexWrap: 'wrap' }}>
+    <div style={{ backgroundColor: '#0f172a', minHeight: '100vh', color: '#f1f5f9', padding: '20px' }}>
+      <div style={{ maxWidth: '1400px', margin: '0 auto' }}>
         
-        {/* ЛЕВАЯ КОЛОНКА */}
-        <div style={{ flex: '1 1 850px' }}>
-          <button onClick={() => navigate(-1)} style={backButtonStyle}>
-            <ChevronLeft size={20} /> Назад
-          </button>
+        <button onClick={() => navigate(-1)} style={backButtonStyle}>
+          <ChevronLeft size={20} /> Назад
+        </button>
 
-          <div style={playerContainerStyle}>
-            <video ref={videoRef} controls playsInline style={{ width: '100%', height: '100%' }} />
-          </div>
-
-          <div style={{ marginTop: '24px' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '20px' }}>
-              <h1 style={{ fontSize: '1.5rem', fontWeight: '700', margin: 0 }}>{videoData?.title}</h1>
-              <button onClick={handleVideoLike} style={{ ...likeButtonStyle, backgroundColor: videoData?.isLiked ? '#3b82f6' : '#1e293b' }}>
-                <ThumbsUp size={20} fill={videoData?.isLiked ? "white" : "none"} />
-                <span>{videoData?.amountOfLikes || 0}</span>
-              </button>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '40px' }}>
+          
+          {/* ЛЕВАЯ ЧАСТЬ */}
+          <div>
+            <div style={playerWrapper}>
+              <video ref={videoRef} controls style={{ width: '100%', height: '100%' }} />
             </div>
+            
+            <h1 style={{ fontSize: '1.6rem', margin: '24px 0 16px 0' }}>{videoData?.title}</h1>
 
-            <div style={descriptionBoxStyle}>
-              <div style={metaRowStyle}>
-                <Clock size={14} /> 
-                <span>{new Date(videoData?.createdAt).toLocaleDateString()}</span>
-                <span style={{ marginLeft: '10px', color: '#3b82f6' }}>@{videoData?.authorNickname}</span>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+              <AuthorProfile userId={videoData?.userId} size="50px" />
+              <div style={{ display: 'flex', gap: '12px' }}>
+                <button onClick={() => {
+                  api.get('/videos/playlist/my').then(r => setPlaylists(r.data.content));
+                  setIsPlaylistModalOpen(true);
+                }} style={actionBtn}>
+                  <PlusCircle size={18}/> Сохранить
+                </button>
+                <button onClick={handleLikeVideo} style={{ ...actionBtn, background: videoData?.isLiked ? '#3b82f6' : '#1e293b' }}>
+                  <ThumbsUp size={18} fill={videoData?.isLiked ? "white" : "none"} /> {videoData?.amountOfLikes}
+                </button>
               </div>
-              <p style={{ margin: 0, whiteSpace: 'pre-wrap' }}>{videoData?.description}</p>
             </div>
-          </div>
 
-          {/* СЕКЦИЯ КОММЕНТАРИЕВ */}
-          <div style={{ marginTop: '40px' }}>
-             <h3 style={{ marginBottom: '20px' }}>{comments.length} Комментариев</h3>
-             <form onSubmit={handleSendComment} style={{ display: 'flex', gap: '12px', marginBottom: '30px' }}>
+            <div style={descriptionBox}>
+              <div style={metaDate}><Clock size={14}/> {formatDate(videoData?.date)}</div>
+              <p style={{ lineHeight: '1.6', color: '#cbd5e1' }}>{videoData?.description}</p>
+            </div>
+
+            {/* КОММЕНТАРИИ */}
+            <div style={{ marginTop: '40px' }}>
+              <h3 style={{ marginBottom: '20px' }}>Комментарии ({comments.length})</h3>
+              
+              <div style={{ display: 'flex', gap: '12px', marginBottom: '32px' }}>
                 <textarea 
-                  value={newComment} 
-                  onChange={(e) => setNewComment(e.target.value)} 
-                  placeholder="Добавить комментарий..." 
                   style={textareaStyle} 
+                  value={newComment} 
+                  onChange={e => setNewComment(e.target.value)} 
+                  placeholder="Оставьте комментарий..." 
                 />
-                <button style={submitButtonStyle}>Отправить</button>
-             </form>
-             {/* Список комментариев... */}
-          </div>
-        </div>
-
-        {/* ПРАВАЯ КОЛОНКА (САЙДБАР РЕКОМЕНДАЦИЙ) */}
-        <div style={{ flex: '1 1 350px' }}>
-          <h4 style={{ color: '#94a3b8', marginBottom: '20px' }}>Рекомендуем</h4>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {recommendations.map((rec) => (
-              <div 
-                key={rec.id} 
-                onClick={() => navigate(`/video/${rec.id}`)}
-                style={recCardStyle}
-                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1e293b'}
-                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
-              >
-                <div style={recThumbnailWrapper}>
-                  {/* ИСПОЛЬЗУЕМ ТОТ ЖЕ КОМПОНЕНТ ЧТО И НА СТРАНИЦЕ РЕКОМЕНДАЦИЙ */}
-                  <ProtectedThumbnail url={rec.thumbnailUrl} />
-                </div>
-                
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <h5 style={recTitleStyle}>{rec.title}</h5>
-                  <p style={recAuthorStyle}>{rec.authorNickname}</p>
-                  <p style={recAuthorStyle}>{rec.amountOfViews || 0} просмотров</p>
-                </div>
+                <button onClick={handleSendComment} style={submitBtn}>Отправить</button>
               </div>
-            ))}
+              
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
+                {comments.map(c => (
+                  <div key={c.id} style={{ borderBottom: '1px solid #1e293b', paddingBottom: '20px' }}>
+                    <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                      {/* Используем ваш рабочий компонент для каждого комментария */}
+                      <AuthorProfile userId={c.userId} size="40px" />
+                      <div style={{ flex: 1, paddingTop: '4px' }}>
+                        <div style={{ color: '#e2e8f0', fontSize: '0.95rem', lineHeight: '1.5' }}>
+                          {c.content}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          {/* ПРАВАЯ ЧАСТЬ (РЕКОМЕНДАЦИИ) */}
+          <div>
+            <h3 style={{ marginBottom: '20px', fontSize: '1.1rem' }}>Похожие видео</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              {recommendations.map(v => (
+                <div key={v.id} onClick={() => navigate(`/video/${v.id}`)} style={recCard}>
+                  <SecureImage path={v.thumbnailUrl} style={recImg} />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={recTitle}>{v.title}</div>
+                    <div style={recDesc}>{v.description}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+      {/* МОДАЛКА ПЛЕЙЛИСТОВ */}
+      {isPlaylistModalOpen && (
+        <div style={modalOverlay} onClick={() => setIsPlaylistModalOpen(false)}>
+          <div style={modalContent} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
+              <h3 style={{ margin: 0 }}>Добавить в плейлист</h3>
+              <X cursor="pointer" onClick={() => setIsPlaylistModalOpen(false)} />
+            </div>
+            <div style={{ maxHeight: '300px', overflowY: 'auto' }}>
+              {playlists.map(pl => (
+                <div key={pl.id} style={playlistRow} onClick={() => {
+                  api.post(`/videos/playlist/${pl.id}/videos/${id}`).then(() => setIsPlaylistModalOpen(false));
+                }}>
+                  <ListMusic size={18} color="#3b82f6" /> {pl.title}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-
-      </div>
+      )}
     </div>
   );
 };
 
-// --- СТИЛИ ---
-const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white' };
-const backButtonStyle = { background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '16px' };
-const playerContainerStyle = { width: '100%', aspectRatio: '16/9', background: 'black', borderRadius: '12px', overflow: 'hidden' };
-const likeButtonStyle = { display: 'flex', alignItems: 'center', gap: '8px', padding: '8px 16px', borderRadius: '20px', border: 'none', color: 'white', cursor: 'pointer' };
-const descriptionBoxStyle = { background: '#1e293b', padding: '16px', borderRadius: '12px', marginTop: '16px' };
-const metaRowStyle = { display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', fontSize: '0.9rem', marginBottom: '8px' };
-const textareaStyle = { flex: 1, background: '#1e293b', border: '1px solid #334155', borderRadius: '8px', color: 'white', padding: '12px', resize: 'none' };
-const submitButtonStyle = { background: '#3b82f6', border: 'none', color: 'white', padding: '0 20px', borderRadius: '8px', cursor: 'pointer' };
+// --- СТИЛИ (ГАРМОНИЧНЫЕ С ВАШИМ ДИЗАЙНОМ) ---
+const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white', background: '#0f172a' };
+const backButtonStyle = { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', marginBottom: '20px' };
+const playerWrapper = { width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
+const actionBtn = { display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 18px', borderRadius: '12px', border: 'none', color: 'white', cursor: 'pointer', background: '#1e293b', fontWeight: '600' };
+const descriptionBox = { background: '#1e293b', padding: '20px', borderRadius: '16px', border: '1px solid #334155' };
+const metaDate = { display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', marginBottom: '10px', fontSize: '0.85rem' };
+const textareaStyle = { flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', color: 'white', padding: '14px', resize: 'none', minHeight: '60px', outline: 'none' };
+const submitBtn = { background: '#3b82f6', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' };
 
-const recCardStyle = { display: 'flex', gap: '12px', cursor: 'pointer', padding: '8px', borderRadius: '8px', transition: '0.2s' };
-const recThumbnailWrapper = { width: '140px', height: '80px', borderRadius: '8px', overflow: 'hidden', flexShrink: 0 };
-const recTitleStyle = { color: 'white', fontSize: '0.9rem', margin: '0 0 4px 0', fontWeight: '600', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
-const recAuthorStyle = { color: '#94a3b8', fontSize: '0.8rem', margin: 0 };
+const recCard = { display: 'flex', gap: '12px', cursor: 'pointer', background: '#1e293b', padding: '8px', borderRadius: '12px' };
+const recImg = { width: '140px', height: '80px', borderRadius: '8px', flexShrink: 0 };
+const recTitle = { fontSize: '0.9rem', fontWeight: 'bold', color: '#f1f5f9', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
+const recDesc = { fontSize: '0.8rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
+
+const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
+const modalContent = { background: '#1e293b', padding: '25px', borderRadius: '20px', width: '350px' };
+const playlistRow = { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', cursor: 'pointer', borderRadius: '10px', background: '#0f172a', marginBottom: '8px' };
 
 export default VideoPlayerPage;
