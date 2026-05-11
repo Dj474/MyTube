@@ -12,27 +12,30 @@ const SecureThumbnail = ({ url, title, isAvatar = false }) => {
 
   useEffect(() => {
     let objectUrl = null;
+    let isMounted = true;
 
     const fetchImage = async () => {
       if (!url) return;
       try {
         const response = await api.get(url, { responseType: 'blob' });
-        objectUrl = URL.createObjectURL(response.data);
-        setImageSrc(objectUrl);
+        if (isMounted) {
+          objectUrl = URL.createObjectURL(response.data);
+          setImageSrc(objectUrl);
+        }
       } catch (err) {
         console.error("Ошибка загрузки изображения:", err);
-        setError(true);
+        if (isMounted) setError(true);
       }
     };
 
     fetchImage();
 
     return () => {
+      isMounted = false;
       if (objectUrl) URL.revokeObjectURL(objectUrl);
     };
   }, [url]);
 
-  // Если ошибка или нет URL, показываем иконку-заглушку
   if (error || !url) {
     return (
       <div style={isAvatar ? avatarPlaceholderStyle : placeholderStyle}>
@@ -131,7 +134,6 @@ const Subscriptions = () => {
                 style={authorCardStyle}
               >
                 <div style={circleStyle}>
-                  {/* Теперь здесь загружается реальное фото автора */}
                   <SecureThumbnail 
                     url={sub.photoUrl} 
                     title={sub.nickname} 
@@ -162,6 +164,8 @@ const Subscriptions = () => {
             key={video.id} 
             onClick={() => navigate(`/video/${video.id}`)}
             style={videoCardStyle}
+            onMouseEnter={(e) => e.currentTarget.style.transform = 'translateY(-5px)'}
+            onMouseLeave={(e) => e.currentTarget.style.transform = 'translateY(0)'}
           >
             <div style={thumbnailContainerStyle}>
               <SecureThumbnail url={video.thumbnailUrl} title={video.title} />
@@ -169,13 +173,9 @@ const Subscriptions = () => {
 
             <div style={{ padding: '15px' }}>
               <h3 style={videoTitleStyle}>{video.title}</h3>
-              <div style={videoInfoRowStyle}>
-                <span style={{ color: '#3b82f6', fontWeight: '500' }}>@{video.authorNickname || 'Автор'}</span>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                  <Clock size={12} />
-                  <span>{new Date(video.createdAt).toLocaleDateString()}</span>
-                </div>
-              </div>
+              <p style={videoDescriptionStyle}>
+                {video.description || "Нет описания."}
+              </p>
             </div>
           </div>
         ))}
@@ -186,16 +186,41 @@ const Subscriptions = () => {
   );
 };
 
-// --- ДОПОЛНЕННЫЕ СТИЛИ ---
+// --- СТИЛИ ---
+
+const authorCardStyle = { 
+  display: 'flex', flexDirection: 'column', alignItems: 'center', 
+  cursor: 'pointer', flexShrink: 0, width: '85px', transition: 'transform 0.2s' 
+};
 
 const circleStyle = {
   width: '75px', height: '75px', borderRadius: '50%', background: '#1e293b', 
-  border: '2px solid #334155', overflow: 'hidden', // Чтобы картинка не вылезала за границы круга
+  border: '2px solid #334155', overflow: 'hidden',
   display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '10px'
 };
 
-const avatarImageStyle = {
-  width: '100%', height: '100%', objectFit: 'cover'
+const nicknameStyle = { 
+  fontSize: '0.85rem', color: '#cbd5e1', textAlign: 'center', 
+  width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' 
+};
+
+const videoGridStyle = { 
+  display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '25px' 
+};
+
+const videoCardStyle = { 
+  background: '#1e293b', borderRadius: '15px', overflow: 'hidden', 
+  cursor: 'pointer', border: '1px solid #334155', transition: 'transform 0.2s ease' 
+};
+
+const thumbnailContainerStyle = { width: '100%', aspectRatio: '16/9', background: '#000', overflow: 'hidden' };
+
+const imageStyle = { width: '100%', height: '100%', objectFit: 'cover' };
+const avatarImageStyle = { width: '100%', height: '100%', objectFit: 'cover' };
+
+const placeholderStyle = { 
+  width: '100%', height: '100%', background: 'linear-gradient(45deg, #0f172a, #1e3a8a)', 
+  display: 'flex', alignItems: 'center', justifyContent: 'center' 
 };
 
 const avatarPlaceholderStyle = {
@@ -203,16 +228,27 @@ const avatarPlaceholderStyle = {
   display: 'flex', alignItems: 'center', justifyContent: 'center'
 };
 
-// Оставляем остальные стили без изменений...
-const authorCardStyle = { display: 'flex', flexDirection: 'column', alignItems: 'center', cursor: 'pointer', flexShrink: 0, width: '85px', transition: 'transform 0.2s' };
-const nicknameStyle = { fontSize: '0.85rem', color: '#cbd5e1', textAlign: 'center', width: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
-const videoGridStyle = { display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: '25px' };
-const videoCardStyle = { background: '#1e293b', borderRadius: '15px', overflow: 'hidden', cursor: 'pointer', border: '1px solid #334155', transition: 'transform 0.2s' };
-const thumbnailContainerStyle = { width: '100%', aspectRatio: '16/9', background: '#000', overflow: 'hidden' };
-const imageStyle = { width: '100%', height: '100%', objectFit: 'cover' };
-const placeholderStyle = { width: '100%', height: '100%', background: 'linear-gradient(45deg, #0f172a, #1e3a8a)', display: 'flex', alignItems: 'center', justifyContent: 'center' };
-const videoTitleStyle = { fontSize: '1.05rem', margin: 0, color: '#f1f5f9', fontWeight: '600', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
-const videoInfoRowStyle = { display: 'flex', justifyContent: 'space-between', marginTop: '12px', fontSize: '0.85rem', color: '#94a3b8' };
-const arrowButtonStyle = { position: 'absolute', zIndex: 10, background: '#3b82f6', border: 'none', color: 'white', borderRadius: '50%', width: '40px', height: '40px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', transition: '0.3s ease', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' };
+const videoTitleStyle = { 
+  fontSize: '1.05rem', margin: 0, color: '#f1f5f9', fontWeight: '600', 
+  display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' 
+};
+
+const videoDescriptionStyle = {
+  fontSize: '0.85rem', color: '#94a3b8', marginTop: '8px', lineHeight: '1.4',
+  display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', 
+  overflow: 'hidden', textOverflow: 'ellipsis'
+};
+
+const arrowButtonStyle = { 
+  position: 'absolute', zIndex: 10, background: '#3b82f6', border: 'none', 
+  color: 'white', borderRadius: '50%', width: '40px', height: '40px', 
+  display: 'flex', alignItems: 'center', justifyContent: 'center', 
+  cursor: 'pointer', transition: '0.3s ease', boxShadow: '0 4px 12px rgba(0,0,0,0.5)' 
+};
+
+const centerStyle = { 
+  display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', 
+  background: '#0f172a', color: 'white' 
+};
 
 export default Subscriptions;
