@@ -5,7 +5,7 @@ import org.springframework.web.bind.annotation.*;
 import org.userservice.service.report.ReportService;
 
 @RestController
-@RequestMapping("/api/v1/users/reports")
+@RequestMapping("/api/v1/profile/reports")
 @RequiredArgsConstructor
 public class ReportController {
 
@@ -13,15 +13,7 @@ public class ReportController {
 
     @PostMapping("/{targetUserId}")
     public void sendReport(@PathVariable Long targetUserId,
-                           @RequestHeader("X-User-Id") Long reporterId,
                            @RequestBody ReportDto dto) {
-        reportService.createReport(reporterId, targetUserId, dto.getReason(), dto.getDescription());
+        reportService.createReport(targetUserId, dto.getReason(), dto.getDescription());
     }
-}
-
-// Простой DTO для входящих данных
-@lombok.Data
-class ReportDto {
-    private String reason;
-    private String description;
 }

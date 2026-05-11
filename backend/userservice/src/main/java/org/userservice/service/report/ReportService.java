@@ -8,6 +8,7 @@ import org.userservice.entity.user.User;
 import org.userservice.other.enums.report.ReportReason;
 import org.userservice.repository.report.ReportRepository;
 import org.userservice.repository.user.UserRepository;
+import org.userservice.service.user.UserService;
 
 @Service
 @RequiredArgsConstructor
@@ -15,14 +16,16 @@ public class ReportService {
 
     private final ReportRepository reportRepository;
     private final UserRepository userRepository;
+    private final UserService userService;
 
     @Transactional
-    public void createReport(Long reporterId, Long targetUserId, String reason, String description) {
-        if (reporterId.equals(targetUserId)) {
+    public void createReport(Long targetUserId, String reason, String description) {
+        User curr = userService.getCurrent();
+        if (curr.getId().equals(targetUserId)) {
             throw new RuntimeException("Нельзя жаловаться на самого себя");
         }
 
-        User reporter = userRepository.findById(reporterId)
+        User reporter = userRepository.findById(curr.getId())
                 .orElseThrow(() -> new RuntimeException("Репортер не найден"));
         User target = userRepository.findById(targetUserId)
                 .orElseThrow(() -> new RuntimeException("Цель жалобы не найдена"));
