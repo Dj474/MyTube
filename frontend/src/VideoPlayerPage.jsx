@@ -164,12 +164,29 @@ const VideoPlayerPage = () => {
     } catch { alert("Ошибка отправки"); }
   };
 
-  // --- ЛОГИКА ОТПРАВКИ ЖАЛОБЫ ---
+  const handleLikeComment = async (commentId) => {
+    setComments(prev => prev.map(c => {
+      if (c.id === commentId) {
+        const active = c.isLiked;
+        return { 
+          ...c, 
+          isLiked: !active, 
+          amountOfLikes: active ? c.amountOfLikes - 1 : c.amountOfLikes + 1 
+        };
+      }
+      return c;
+    }));
+    try {
+      const target = comments.find(c => c.id === commentId);
+      target.isLiked ? await api.delete(`/comments/like/${commentId}`) : await api.post(`/comments/like/${commentId}`);
+    } catch {}
+  };
+
   const submitReport = async () => {
     try {
       const endpoint = reportModal.type === 'video' 
         ? `/videos/report/${id}` 
-        : `/comments/report/${reportModal.targetId}`;
+        : `/videos/comments/report/${reportModal.targetId}`;
       
       await api.post(endpoint, reportForm);
       alert("Жалоба успешно отправлена");
@@ -192,7 +209,6 @@ const VideoPlayerPage = () => {
 
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 380px', gap: '40px' }}>
           
-          {/* ЛЕВАЯ ЧАСТЬ */}
           <div>
             <div style={playerWrapper}>
               <video ref={videoRef} controls style={{ width: '100%', height: '100%' }} />
@@ -206,7 +222,6 @@ const VideoPlayerPage = () => {
                 <button 
                   onClick={() => setReportModal({ isOpen: true, type: 'video', targetId: id })} 
                   style={{ ...actionBtn, color: '#f87171' }} 
-                  title="Пожаловаться на видео"
                 >
                   <Flag size={18}/>
                 </button>
@@ -227,7 +242,6 @@ const VideoPlayerPage = () => {
               <p style={{ lineHeight: '1.6', color: '#cbd5e1' }}>{videoData?.description}</p>
             </div>
 
-            {/* КОММЕНТАРИИ */}
             <div style={{ marginTop: '40px' }}>
               <h3 style={{ marginBottom: '20px' }}>Комментарии ({comments.length})</h3>
               
@@ -250,12 +264,21 @@ const VideoPlayerPage = () => {
                         <div style={{ color: '#e2e8f0', fontSize: '0.95rem', lineHeight: '1.5' }}>
                           {c.content}
                         </div>
-                        <button 
-                          onClick={() => setReportModal({ isOpen: true, type: 'comment', targetId: c.id })} 
-                          style={commentReportBtn}
-                        >
-                          <AlertTriangle size={14} /> <span style={{ fontSize: '0.8rem' }}>Пожаловаться</span>
-                        </button>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginTop: '10px' }}>
+                          <button 
+                            onClick={() => handleLikeComment(c.id)} 
+                            style={{ ...iconBtn, color: c.isLiked ? '#f87171' : '#64748b' }}
+                          >
+                            <Heart size={14} fill={c.isLiked ? "#f87171" : "none"} /> 
+                            <span style={{ fontSize: '0.85rem' }}>{c.amountOfLikes || 0}</span>
+                          </button>
+                          <button 
+                            onClick={() => setReportModal({ isOpen: true, type: 'comment', targetId: c.id })} 
+                            style={commentReportBtn}
+                          >
+                            <AlertTriangle size={14} /> <span style={{ fontSize: '0.8rem' }}>Пожаловаться</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -264,7 +287,6 @@ const VideoPlayerPage = () => {
             </div>
           </div>
 
-          {/* ПРАВАЯ ЧАСТЬ */}
           <div>
             <h3 style={{ marginBottom: '20px', fontSize: '1.1rem' }}>Похожие видео</h3>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -279,11 +301,9 @@ const VideoPlayerPage = () => {
               ))}
             </div>
           </div>
-
         </div>
       </div>
 
-      {/* МОДАЛКА ПЛЕЙЛИСТОВ */}
       {isPlaylistModalOpen && (
         <div style={modalOverlay} onClick={() => setIsPlaylistModalOpen(false)}>
           <div style={modalContent} onClick={e => e.stopPropagation()}>
@@ -304,15 +324,13 @@ const VideoPlayerPage = () => {
         </div>
       )}
 
-      {/* --- МОДАЛКА ЖАЛОБЫ (НОВАЯ) --- */}
       {reportModal.isOpen && (
         <div style={modalOverlay} onClick={() => setReportModal({ isOpen: false, type: null, targetId: null })}>
           <div style={modalContent} onClick={e => e.stopPropagation()}>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px' }}>
-              <h3 style={{ margin: 0 }}>Пожаловаться на {reportModal.type === 'video' ? 'видео' : 'комментарий'}</h3>
+              <h3 style={{ margin: 0 }}>Пожаловаться</h3>
               <X cursor="pointer" onClick={() => setReportModal({ isOpen: false, type: null, targetId: null })} />
             </div>
-            
             <div style={{ marginBottom: '15px' }}>
               <label style={labelStyle}>Причина</label>
               <select 
@@ -327,29 +345,24 @@ const VideoPlayerPage = () => {
                 <option value="OTHER">Другое</option>
               </select>
             </div>
-
             <div style={{ marginBottom: '20px' }}>
-              <label style={labelStyle}>Описание (необязательно)</label>
+              <label style={labelStyle}>Описание</label>
               <textarea 
                 style={{ ...textareaStyle, width: '100%', minHeight: '80px' }}
-                placeholder="Расскажите подробнее..."
                 value={reportForm.description}
                 onChange={e => setReportForm({...reportForm, description: e.target.value})}
               />
             </div>
-
             <button onClick={submitReport} style={reportSubmitBtn}>
-              <Send size={16} /> Отправить жалобу
+              <Send size={16} /> Отправить
             </button>
           </div>
         </div>
       )}
-
     </div>
   );
 };
 
-// --- СТИЛИ ---
 const centerStyle = { display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', color: 'white', background: '#0f172a' };
 const backButtonStyle = { display: 'flex', alignItems: 'center', gap: '8px', background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', marginBottom: '20px' };
 const playerWrapper = { width: '100%', aspectRatio: '16/9', background: '#000', borderRadius: '16px', overflow: 'hidden', boxShadow: '0 20px 40px rgba(0,0,0,0.4)' };
@@ -358,19 +371,17 @@ const descriptionBox = { background: '#1e293b', padding: '20px', borderRadius: '
 const metaDate = { display: 'flex', alignItems: 'center', gap: '8px', color: '#94a3b8', marginBottom: '10px', fontSize: '0.85rem' };
 const textareaStyle = { flex: 1, background: '#0f172a', border: '1px solid #334155', borderRadius: '12px', color: 'white', padding: '14px', resize: 'none', minHeight: '60px', outline: 'none' };
 const submitBtn = { background: '#3b82f6', border: 'none', color: 'white', padding: '0 25px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold' };
-
-const commentReportBtn = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', marginTop: '8px', padding: 0, display: 'flex', alignItems: 'center', gap: '4px', transition: '0.2s' };
+const iconBtn = { background: 'none', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '6px', padding: 0 };
+const commentReportBtn = { background: 'none', border: 'none', color: '#64748b', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px' };
 const labelStyle = { display: 'block', marginBottom: '8px', fontSize: '0.85rem', color: '#94a3b8', fontWeight: 'bold' };
 const selectStyle = { width: '100%', background: '#0f172a', border: '1px solid #334155', borderRadius: '10px', padding: '10px', color: 'white', outline: 'none' };
 const reportSubmitBtn = { width: '100%', background: '#ef4444', border: 'none', color: 'white', padding: '12px', borderRadius: '12px', cursor: 'pointer', fontWeight: 'bold', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' };
-
 const recCard = { display: 'flex', gap: '12px', cursor: 'pointer', background: '#1e293b', padding: '8px', borderRadius: '12px' };
 const recImg = { width: '140px', height: '80px', borderRadius: '8px', flexShrink: 0 };
 const recTitle = { fontSize: '0.9rem', fontWeight: 'bold', color: '#f1f5f9', marginBottom: '4px', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' };
 const recDesc = { fontSize: '0.8rem', color: '#94a3b8', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' };
-
 const modalOverlay = { position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.85)', display: 'flex', justifyContent: 'center', alignItems: 'center', zIndex: 1000 };
-const modalContent = { background: '#1e293b', padding: '25px', borderRadius: '24px', width: '400px', border: '1px solid #334155', boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)' };
+const modalContent = { background: '#1e293b', padding: '25px', borderRadius: '24px', width: '400px', border: '1px solid #334155' };
 const playlistRow = { display: 'flex', alignItems: 'center', gap: '12px', padding: '12px', cursor: 'pointer', borderRadius: '10px', background: '#0f172a', marginBottom: '8px' };
 
 export default VideoPlayerPage;

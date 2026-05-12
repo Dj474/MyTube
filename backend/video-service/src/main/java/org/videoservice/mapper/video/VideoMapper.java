@@ -17,7 +17,7 @@ public abstract class VideoMapper {
     public abstract VideoInfoDtoOut toDto(Video video);
 
     @Mapping(target = "isLiked", expression = "java(isLiked(video, userId))")
-    @Mapping(target = "amountOfLikes", expression = "java(getAmountOfLikes(video))")
+    @Mapping(target = "amountOfLikes", source = "video.likesCount")
     @Mapping(target = "date", source = "video.createdAt")
     public abstract VideoInfoDtoOut toDtoWithLikes(Video video, Long userId);
 

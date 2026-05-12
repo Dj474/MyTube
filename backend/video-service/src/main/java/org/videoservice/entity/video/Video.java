@@ -64,4 +64,7 @@ public class Video {
 
     @OneToMany(mappedBy = "video")
     private List<History> histories;
+
+    @Column(name = "likes_count")
+    private Long likesCount;
 }

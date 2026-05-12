@@ -53,4 +53,7 @@ public class Comment {
     @OneToMany(mappedBy = "comment", fetch = FetchType.LAZY)
     private List<Like> likes;
 
+    @Column(name = "likes_count")
+    private Long likesCount;
+
 }

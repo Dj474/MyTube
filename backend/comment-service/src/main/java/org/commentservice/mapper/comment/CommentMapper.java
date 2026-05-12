@@ -25,7 +25,7 @@ public abstract class CommentMapper {
 
     @Mapping(target = "parentId", source = "comment.parent.id")
     @Mapping(target = "isLiked", expression = "java(isLiked(comment, userId))")
-    @Mapping(target = "amountOfLikes", expression = "java(getAmountOfLikes(comment))")
+    @Mapping(target = "amountOfLikes", source = "comment.likesCount")
     public abstract CommentDtoOut toDtoWithLikes(Comment comment, Long userId);
 
     protected Boolean isLiked(Comment comment, Long userId) {

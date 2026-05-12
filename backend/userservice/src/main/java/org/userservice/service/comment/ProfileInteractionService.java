@@ -106,7 +106,7 @@ public class ProfileInteractionService {
                             .authorNickname(comment.getAuthor().getProfile().getFirstName())
                             .content(comment.getContent())
                             .createdAt(comment.getCreatedAt())
-                            .likesCount(likes)
+                            .likesCount(comment.getLikesCount())
                             .isLiked(likedByMe)
                             .build();
                 });

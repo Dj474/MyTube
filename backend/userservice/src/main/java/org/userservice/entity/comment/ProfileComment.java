@@ -31,4 +31,7 @@ public class ProfileComment {
 
     @Builder.Default
     private LocalDateTime createdAt = LocalDateTime.now();
+
+    @Column(name = "likes_count")
+    private Long likesCount;
 }
