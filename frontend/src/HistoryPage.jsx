@@ -100,9 +100,9 @@ const HistoryPage = () => {
 
               <div style={{ flex: 1 }}>
                 <h3 style={{ color: '#f1f5f9', margin: '0 0 4px 0', fontSize: '1.1rem' }}>{video.title}</h3>
-                <p style={{ color: '#3b82f6', fontSize: '0.85rem', margin: '0 0 8px 0', fontWeight: '500' }}>
+                {/* <p style={{ color: '#3b82f6', fontSize: '0.85rem', margin: '0 0 8px 0', fontWeight: '500' }}>
                   {video.authorNickname} • {video.viewsCount} просмотров
-                </p>
+                </p> */}
                 <p style={{ color: '#94a3b8', fontSize: '0.85rem', margin: 0, lineHeight: '1.4' }}>
                   {video.description?.length > 150 
                     ? `${video.description.substring(0, 150)}...` 

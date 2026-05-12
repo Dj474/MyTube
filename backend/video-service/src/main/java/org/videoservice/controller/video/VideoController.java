@@ -55,4 +55,9 @@ public class VideoController {
         return videoService.getSubscriptionVideos(params, userId);
     }
 
+    @DeleteMapping("/{videoId}")
+    public void deleteVideo(@PathVariable UUID videoId, @RequestHeader("X-User-Id") Long userId) {
+        videoService.deleteVideo(userId, videoId);
+    }
+
 }

@@ -186,7 +186,7 @@ const VideoPlayerPage = () => {
     try {
       const endpoint = reportModal.type === 'video' 
         ? `/videos/report/${id}` 
-        : `/videos/comments/report/${reportModal.targetId}`;
+        : `/comments/report/${reportModal.targetId}`;
       
       await api.post(endpoint, reportForm);
       alert("Жалоба успешно отправлена");

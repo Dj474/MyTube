@@ -16,6 +16,7 @@ import org.videoservice.dto.video.VideoUploadDto;
 import org.videoservice.entity.tag.Tag;
 import org.videoservice.entity.video.Video;
 import org.videoservice.entity.video.Video_;
+import org.videoservice.exception.ForbiddenException;
 import org.videoservice.mapper.video.VideoMapper;
 import org.videoservice.other.enums.VideoStatus;
 import org.videoservice.other.record.kafka.VideoForSearchRecord;
@@ -122,6 +123,12 @@ public class VideoService {
         VideoSpecification specification = new VideoSpecification(userId);
         Page<Video> page = videoRepository.findAll(specification, pageable);
         return page.map(videoMapper::toDto);
+    }
+
+    public void deleteVideo(Long userId, UUID videoId) {
+        Video video = videoRepository.byId(videoId);
+        if (!video.getUserId().equals(userId)) throw new ForbiddenException("you-cant-delete-this-video");
+        videoRepository.delete(video);
     }
 
 }
